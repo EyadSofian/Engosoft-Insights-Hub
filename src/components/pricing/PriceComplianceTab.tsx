@@ -358,7 +358,7 @@ export function PriceComplianceTab({
         align: "right",
         minWidth: "112px",
         render: (row) => (
-          <span className="num text-[12.5px] font-medium text-text">
+          <span className="num text-[12.5px] font-semibold text-text">
             {fmtMoney(row.actualUnitPrice, row.currency, lang)}
           </span>
         ),
@@ -400,7 +400,7 @@ export function PriceComplianceTab({
           : "Collected minus the approved floor, across the quantity sold.",
         render: (row) =>
           row.varianceAmount > 0 ? (
-            <span className="num text-[12.5px] font-medium" style={{ color: "var(--danger)" }}>
+            <span className="num text-[12.5px] font-semibold" style={{ color: "var(--danger)" }}>
               {fmtMoney(row.varianceAmount, row.currency, lang)}
             </span>
           ) : (
@@ -505,13 +505,13 @@ export function PriceComplianceTab({
             type="button"
             onClick={() => setShowFilters((open) => !open)}
             aria-expanded={showFilters}
-            className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 text-[12px] font-medium text-text-muted transition-colors hover:bg-surface-2 hover:text-text"
+            className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-border px-3 text-[12px] font-semibold text-text-muted transition-colors hover:bg-surface-2 hover:text-text"
           >
             <SlidersHorizontal size={14} aria-hidden="true" />
             {ar ? "فلاتر" : "Filters"}
             {!!activeFilters.length && (
               <span
-                className="num grid h-[17px] min-w-[17px] place-items-center rounded-full px-1 text-[12px] font-medium text-white"
+                className="num grid h-[17px] min-w-[17px] place-items-center rounded-full px-1 text-[12px] font-bold text-white"
                 style={{ background: "var(--brand)" }}
               >
                 {activeFilters.length}
@@ -532,7 +532,7 @@ export function PriceComplianceTab({
                   dir: filters.dir,
                 })
               }
-              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium text-text-muted transition-colors hover:text-text"
+              className="inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-semibold text-text-muted transition-colors hover:text-text"
             >
               <RotateCcw size={13} aria-hidden="true" />
               {ar ? "مسح الفلاتر" : "Clear filters"}
@@ -783,7 +783,7 @@ function InvoiceCardList({
           >
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <div className="truncate text-[13px] font-medium text-text">
+                <div className="truncate text-[13px] font-semibold text-text">
                   <bdi>{row.productName || "—"}</bdi>
                 </div>
                 <div className="num mt-0.5 text-[12px] text-text-subtle">
@@ -818,7 +818,7 @@ function InvoiceCardList({
                 <div key={cell.label}>
                   <div className="text-[12px] text-text-subtle">{cell.label}</div>
                   <div
-                    className="num mt-0.5 truncate text-[12px] font-medium"
+                    className="num mt-0.5 truncate text-[12px] font-semibold"
                     style={{ color: cell.tone }}
                   >
                     {cell.value}

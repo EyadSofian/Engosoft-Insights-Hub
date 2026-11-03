@@ -354,7 +354,7 @@ export function MultiLineChart({
     <ChartFrame height={height}>
       {/* No negative left margin: it slid the y-axis "0" under the first x-axis
           label, so the two collided in the corner. tickMargin keeps them apart. */}
-      <AreaChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
+      <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 4 }}>
         <CartesianGrid stroke={gridStroke} vertical={false} strokeDasharray="3 3" />
         <XAxis
           dataKey="date"
@@ -401,16 +401,8 @@ export function MultiLineChart({
           iconSize={8}
           wrapperStyle={{ fontSize: 12, color: "var(--text-muted)", paddingTop: 8 }}
         />
-        <defs>
-          {series.map((s) => (
-            <linearGradient key={s.key} id={`fill-${s.key}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={s.color} stopOpacity={0.22} />
-              <stop offset="100%" stopColor={s.color} stopOpacity={0} />
-            </linearGradient>
-          ))}
-        </defs>
         {series.map((s) => (
-          <Area
+          <Line
             key={s.key}
             yAxisId={s.axis ?? "left"}
             type="monotone"
@@ -418,72 +410,12 @@ export function MultiLineChart({
             name={s.name}
             stroke={s.color}
             strokeWidth={2}
-            fill={`url(#fill-${s.key})`}
             dot={false}
-            activeDot={{ r: 4, strokeWidth: 2, stroke: "var(--surface)" }}
+            activeDot={{ r: 4 }}
           />
         ))}
-      </AreaChart>
+      </LineChart>
     </ChartFrame>
-  );
-}
-
-/**
- * A target as a ring.
- *
- * For a figure whose whole meaning is "how much of the way there": the arc
- * carries the share, the number in the middle carries the value. A bar says
- * the same thing but needs the full width of a card to say it.
- */
-export function Gauge({
-  pct,
-  value,
-  label,
-  color = "var(--brand)",
-  size = 92,
-}: {
-  pct: number;
-  value: ReactNode;
-  label: ReactNode;
-  color?: string;
-  size?: number;
-}) {
-  const stroke = 9;
-  const r = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * r;
-  const filled = (Math.min(Math.max(pct, 0), 100) / 100) * circumference;
-  return (
-    <div className="flex min-w-0 flex-col items-center gap-2">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            fill="none"
-            stroke="var(--surface-2)"
-            strokeWidth={stroke}
-          />
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={r}
-            fill="none"
-            stroke={color}
-            strokeWidth={stroke}
-            strokeLinecap="round"
-            strokeDasharray={`${filled} ${circumference}`}
-            transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          />
-        </svg>
-        <span className="num absolute inset-0 grid place-items-center text-[17px] font-semibold text-text">
-          {value}
-        </span>
-      </div>
-      <span className="line-clamp-2 text-center text-[12px] leading-snug text-text-muted">
-        {label}
-      </span>
-    </div>
   );
 }
 
@@ -674,7 +606,7 @@ export function DonutChart({
         {/* The hole is the only place a donut can state its own total without
             stealing room from the ring. */}
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="num text-xl font-medium text-text sm:text-2xl">{format(total)}</span>
+          <span className="num text-xl font-bold text-text sm:text-2xl">{format(total)}</span>
           {centerCaption && (
             <span className="mt-0.5 max-w-[9rem] text-center text-[12px] leading-tight text-text-muted">
               {centerCaption}

@@ -41,7 +41,7 @@ export function PriceCard({ message, lang }: { message: PriceCardMessage; lang: 
 
       <div className="px-3 py-3">
         <p
-          className={`num text-2xl font-medium ${unavailable || price === NOT_MEASURABLE ? "text-text-muted" : "text-text"}`}
+          className={`num text-2xl font-bold ${unavailable || price === NOT_MEASURABLE ? "text-text-muted" : "text-text"}`}
           data-testid="nexus-price-value"
         >
           {price}

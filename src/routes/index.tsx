@@ -31,11 +31,7 @@ import {
   type DataHealthIssue,
   type WorkspaceLink,
 } from "@/components/dashboard-bits";
-import {
-  InsightDetailTrigger,
-  MetricDetailTrigger,
-  MetricTriggerShell,
-} from "@/components/metric-detail";
+import { InsightDetailTrigger, MetricDetailTrigger } from "@/components/metric-detail";
 import type { MetricDetail } from "@/lib/metric-detail";
 import {
   businessSignals,
@@ -45,7 +41,7 @@ import {
   type BusinessSignals,
   type OverviewResp,
 } from "@/components/overview-metrics";
-import { Gauge, MultiLineChart } from "@/components/charts";
+import { MultiLineChart } from "@/components/charts";
 import {
   formatDisplayMoney,
   usdToDisplayCurrency,
@@ -115,12 +111,10 @@ function TodaysInsights({
   return (
     <InsightRow>
       <InsightDetailTrigger
-        className="col-5"
         detail={details.best}
         card={{
           index: 0,
           kind: "best",
-          variant: "dark",
           eyebrow: lang === "ar" ? "أحسن نتيجة" : "Best result",
           title: course
             ? lang === "ar"
@@ -140,7 +134,6 @@ function TodaysInsights({
       />
 
       <InsightDetailTrigger
-        className="col-4"
         detail={details.risk}
         card={{
           index: 1,
@@ -153,12 +146,10 @@ function TodaysInsights({
       />
 
       <InsightDetailTrigger
-        className="col-3"
         detail={details.decision}
         card={{
           index: 2,
           kind: "opportunity",
-          variant: "fill",
           eyebrow: lang === "ar" ? "فرصة وقرار مقترح" : "Opportunity and decision",
           title: signals.decision.title,
           detail: signals.decision.detail,
@@ -212,6 +203,12 @@ function Overview() {
 
   const { totals: T, health } = data;
   const spendByPlatform = resolveSpendByPlatform(T);
+
+  // Sparklines are drawn from the same daily series the trend charts use — the
+  // response's own numbers, never a curve invented to fill the slot. A metric
+  // the API does not return a series for simply has no sparkline.
+  const seriesOf = (metric: "spend" | "revenue" | "leads" | "won") =>
+    data.trend.length > 1 ? data.trend.map((row) => row[metric]) : undefined;
 
   const period = filters.from && filters.to ? `${filters.from} → ${filters.to}` : undefined;
   const syncLabel = data.syncedAt
@@ -388,11 +385,6 @@ function Overview() {
 
   const targets = workforce.data?.targets;
   const salesTarget = salesTargetMetric(targets, filters.from, filters.to, lang);
-  // The one detail this dashboard has that a generic analytics product does
-  // not: the pace line. Every target bar carries a tick at the share of the
-  // month that has actually gone by, so "41%" reads as ahead or behind at a
-  // glance instead of needing the reader to do the division in their head.
-  const pacePct = monthPacePct(filters.from, filters.to);
 
   const links: WorkspaceLink[] = [
     {
@@ -468,61 +460,58 @@ function Overview() {
       )}
 
       <PageSections className="gap-after-header">
-        {/* 1 — Are we on plan?
-            Not three equal cards. The figure the month is judged on is the
-            biggest thing on the page and the only filled block; the two lead
-            targets sit beside it as rings, because their whole meaning is
-            "how much of the way there". */}
+        {/* 1 — Are we on plan? The three promises the month was planned on. */}
         <PageSection
           level="headline"
           icon={<Target size={16} />}
           title={lang === "ar" ? "الشهر ماشي إزاي؟" : "Is the month on plan?"}
         >
-          <div className="dash-grid">
-            <div data-span="7">
-              <TargetHero
-                detail={
-                  salesTarget?.detail ?? {
-                    id: "overview.salesTarget",
-                    title: lang === "ar" ? "التحصيل مقابل التارجت" : "Collection against target",
-                    value: workforce.isLoading ? "…" : "—",
-                    tone: "mint",
-                    definition:
-                      lang === "ar"
-                        ? "مفيش تارجت مبيعات منشور للفترة دي، فمفيش نسبة نحسبها."
-                        : "No sales target is published for this period, so there is no percentage to compute.",
-                  }
-                }
-                sub={salesTarget?.sub}
-                achieved={targets?.totalAchievementPaid ?? null}
-                pacePct={pacePct}
-                lang={lang}
+          <KpiRow>
+            {salesTarget ? (
+              <MetricDetailTrigger
+                detail={salesTarget.detail}
+                card={{ index: 0, hero: true, sub: salesTarget.sub }}
               />
-            </div>
-            <div data-span="5" className="card pad-card flex flex-col">
-              <div className="text-[13px] text-text-muted">
-                {lang === "ar" ? "أهداف الليدز للشهر" : "Lead targets for the month"}
-              </div>
-              <div className="mt-4 flex flex-1 items-center justify-around gap-4">
-                <LeadGauge
-                  detail={leadGoals.courses}
-                  actual={data.leadTargets.courses.actual}
-                  target={data.leadTargets.courses.target}
-                  blocked={data.leadTargets.reason !== null}
-                  color="var(--chart-3)"
-                  lang={lang}
-                />
-                <LeadGauge
-                  detail={leadGoals.website}
-                  actual={data.leadTargets.website.actual}
-                  target={data.leadTargets.website.target}
-                  blocked={data.leadTargets.reason !== null}
-                  color="var(--chart-2)"
-                  lang={lang}
-                />
-              </div>
-            </div>
-          </div>
+            ) : (
+              <MetricDetailTrigger
+                detail={{
+                  id: "overview.salesTarget",
+                  title: lang === "ar" ? "التحصيل مقابل التارجت" : "Collection against target",
+                  value: workforce.isLoading ? "…" : "—",
+                  tone: "mint",
+                  definition:
+                    lang === "ar"
+                      ? "مفيش تارجت مبيعات منشور للفترة دي، فمفيش نسبة نحسبها."
+                      : "No sales target is published for this period, so there is no percentage to compute.",
+                }}
+                card={{ index: 0, hero: true }}
+              />
+            )}
+            <MetricDetailTrigger
+              detail={leadGoals.courses}
+              card={{
+                index: 1,
+                sub:
+                  data.leadTargets.reason === null
+                    ? `${fmtNum(data.leadTargets.courses.actual ?? 0)} / ${fmtNum(data.leadTargets.courses.target ?? 0)} ${lang === "ar" ? "ليد · هدف الشهر" : "leads · monthly target"}`
+                    : lang === "ar"
+                      ? "محتاج خطة الشهر وفلاتر عامة"
+                      : "Requires a monthly plan and broad filters",
+              }}
+            />
+            <MetricDetailTrigger
+              detail={leadGoals.website}
+              card={{
+                index: 2,
+                sub:
+                  data.leadTargets.reason === null
+                    ? `${fmtNum(data.leadTargets.website.actual ?? 0)} / ${fmtNum(data.leadTargets.website.target ?? 0)} ${lang === "ar" ? "ليد · هدف الشهر" : "leads · monthly target"}`
+                    : lang === "ar"
+                      ? "محتاج خطة الشهر وفلاتر عامة"
+                      : "Requires a monthly plan and broad filters",
+              }}
+            />
+          </KpiRow>
         </PageSection>
 
         {/* 2 — The money and the customers, five figures. */}
@@ -536,6 +525,7 @@ function Overview() {
               detail={metrics.revenue}
               card={{
                 index: 0,
+                spark: seriesOf("revenue"),
                 sub:
                   lang === "ar"
                     ? `منه ${fmtUSD(T.attributedRevenue)} جه من حملات`
@@ -546,6 +536,7 @@ function Overview() {
               detail={metrics.spend}
               card={{
                 index: 1,
+                spark: seriesOf("spend"),
                 sub:
                   data.spendCoverage?.complete === false
                     ? lang === "ar"
@@ -574,6 +565,7 @@ function Overview() {
               detail={metrics.leads}
               card={{
                 index: 3,
+                spark: seriesOf("leads"),
                 sub: `CRM ${fmtNum(T.crmLeads)} + Lost ${fmtNum(T.lost)}`,
               }}
             />
@@ -581,6 +573,7 @@ function Overview() {
               detail={metrics.won}
               card={{
                 index: 4,
+                spark: seriesOf("won"),
                 sub: `${fmtPct(T.conversionRate, 1)} ${lang === "ar" ? "من الليدز" : "of leads"}`,
               }}
             />
@@ -625,12 +618,7 @@ function Overview() {
           icon={<UsersRound size={16} />}
           title={lang === "ar" ? "الفريق مقابل التارجت" : "The team against target"}
         >
-          <TeamTargetBoard
-            data={workforce.data}
-            loading={workforce.isLoading}
-            lang={lang}
-            pacePct={pacePct}
-          />
+          <TeamTargetBoard data={workforce.data} loading={workforce.isLoading} lang={lang} />
         </PageSection>
 
         {/* 5 — Money over time, and where it came from. */}
@@ -638,75 +626,68 @@ function Overview() {
           level="primary"
           title={lang === "ar" ? "التحصيل مقابل الصرف" : "Collection against spend"}
         >
-          <div className="dash-grid">
-            <div data-span="8">
-              <DashboardPanel
-                icon={<TrendingUp size={16} />}
-                title={
-                  lang === "ar" ? "الفلوس اللي دخلت والفلوس اللي اتصرفت" : "Money in and money out"
-                }
-                hint={
-                  lang === "ar"
-                    ? "التحصيل بيوم الدفع، والصرف بيوم ظهور الإعلان."
-                    : "Collection follows Payment Date; spend follows ad date."
-                }
-                action={
-                  <div className="flex flex-wrap items-center gap-2">
-                    <GrainToggle value={spendGrain} onChange={setSpendGrain} lang={lang} />
-                    <DisplayCurrencyToggle
-                      value={displayCurrency}
-                      onChange={setDisplayCurrency}
-                      sarRate={sarRate}
-                      lang={lang}
-                    />
-                  </div>
-                }
-                footer={
-                  <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span
-                        className="size-2 rounded-full"
-                        style={{ background: "var(--mint-strong)" }}
-                        aria-hidden="true"
-                      />
-                      {lang === "ar" ? "التحصيل" : "Collection"}
-                      <b className="num text-text">{money(totalRevenueShown)}</b>
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <span
-                        className="size-2 rounded-full"
-                        style={{ background: "var(--rose-strong)" }}
-                        aria-hidden="true"
-                      />
-                      {lang === "ar" ? "الصرف" : "Spend"}
-                      <b className="num text-text">{money(totalSpendShown)}</b>
-                    </span>
-                  </span>
-                }
-              >
-                <MultiLineChart
-                  data={combinedTrend}
-                  height={280}
-                  format={money}
-                  series={[
-                    {
-                      key: "revenue",
-                      name: lang === "ar" ? "التحصيل" : "Collection",
-                      color: "var(--mint-strong)",
-                    },
-                    {
-                      key: "spend",
-                      name: lang === "ar" ? "الصرف" : "Spend",
-                      color: "var(--rose-strong)",
-                    },
-                  ]}
+          <DashboardPanel
+            icon={<TrendingUp size={16} />}
+            title={
+              lang === "ar" ? "الفلوس اللي دخلت والفلوس اللي اتصرفت" : "Money in and money out"
+            }
+            hint={
+              lang === "ar"
+                ? "التحصيل بيوم الدفع، والصرف بيوم ظهور الإعلان."
+                : "Collection follows Payment Date; spend follows ad date."
+            }
+            action={
+              <div className="flex flex-wrap items-center gap-2">
+                <GrainToggle value={spendGrain} onChange={setSpendGrain} lang={lang} />
+                <DisplayCurrencyToggle
+                  value={displayCurrency}
+                  onChange={setDisplayCurrency}
+                  sarRate={sarRate}
+                  lang={lang}
                 />
-              </DashboardPanel>
-            </div>
-            <div data-span="4">
-              <PlatformSpend spendByPlatform={spendByPlatform} total={T.spend} lang={lang} />
-            </div>
-          </div>
+              </div>
+            }
+            footer={
+              <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span className="inline-flex items-center gap-1.5">
+                  <span
+                    className="size-2 rounded-full"
+                    style={{ background: "var(--mint-strong)" }}
+                    aria-hidden="true"
+                  />
+                  {lang === "ar" ? "التحصيل" : "Collection"}
+                  <b className="num text-text">{money(totalRevenueShown)}</b>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span
+                    className="size-2 rounded-full"
+                    style={{ background: "var(--rose-strong)" }}
+                    aria-hidden="true"
+                  />
+                  {lang === "ar" ? "الصرف" : "Spend"}
+                  <b className="num text-text">{money(totalSpendShown)}</b>
+                </span>
+              </span>
+            }
+          >
+            <MultiLineChart
+              data={combinedTrend}
+              height={280}
+              format={money}
+              series={[
+                {
+                  key: "revenue",
+                  name: lang === "ar" ? "التحصيل" : "Collection",
+                  color: "var(--mint-strong)",
+                },
+                {
+                  key: "spend",
+                  name: lang === "ar" ? "الصرف" : "Spend",
+                  color: "var(--rose-strong)",
+                },
+              ]}
+            />
+          </DashboardPanel>
         </PageSection>
 
         {data.revenueLeadAttribution && (
@@ -818,14 +799,10 @@ function TeamTargetBoard({
   data,
   loading,
   lang,
-  pacePct,
 }: {
   data: AgentAnalyticsResult | undefined;
   loading: boolean;
   lang: "ar" | "en";
-  /** Share of the selected month already elapsed, or null when the window is
-      not a single month starting on the 1st and there is no honest pace. */
-  pacePct: number | null;
 }) {
   const A = lang === "ar";
   if (loading && !data) return <Skeleton className="h-64" />;
@@ -843,27 +820,26 @@ function TeamTargetBoard({
   const top = rows.slice(0, 5);
   const bottom = rows.length > 5 ? rows.slice(-5).reverse() : [];
   const List = ({ title, items, tone }: { title: string; items: typeof rows; tone: string }) => (
-    <div className="pad-card min-w-0">
-      <div className="mb-4 text-[13px] font-medium text-text">{title}</div>
-      <ul className="space-y-4">
+    <div className="card pad-card">
+      <div className="mb-3 text-[13px] font-bold text-text">{title}</div>
+      <ul className="space-y-3">
         {items.map((row) => {
           const pct = row.target!.achievementPaid ?? 0;
           return (
             <li key={row.name}>
               <div className="flex items-baseline justify-between gap-3 text-[13px]">
-                <span className="min-w-0 truncate text-text" title={row.displayName}>
+                <span className="min-w-0 truncate font-semibold text-text" title={row.displayName}>
                   {row.displayName}
                 </span>
-                <span className="num shrink-0 font-medium text-text">{pct.toFixed(0)}%</span>
+                <span className="num shrink-0 font-bold text-text">{pct.toFixed(0)}%</span>
               </div>
-              <div className="relative mt-2 h-1.5 rounded-full bg-surface-2">
+              <div className="mt-1 h-2 overflow-hidden rounded-full bg-surface-2">
                 <div
                   className="h-full rounded-full"
                   style={{ width: `${Math.min(pct, 100)}%`, background: tone }}
                 />
-                {pacePct !== null && <PaceMark pct={pacePct} lang={lang} />}
               </div>
-              <div className="num mt-2 text-[12px] text-text-muted">
+              <div className="num mt-1 text-[12px] text-text-muted">
                 {fmtUSD(row.paidRevenue)} {A ? "من" : "of"} {fmtUSD(row.target!.target ?? 0)}
               </div>
             </li>
@@ -872,12 +848,9 @@ function TeamTargetBoard({
       </ul>
     </div>
   );
-  // One card split by a hairline, not two cards side by side. The two lists are
-  // the two halves of one comparison — drawing a separate container around each
-  // adds a rectangle and says they are separate things.
   return (
     <div>
-      <div className="card grid md:grid-cols-2 md:divide-x md:divide-border rtl:md:divide-x-reverse">
+      <div className="card-grid md:grid-cols-2">
         <List
           title={A ? "الأقرب للتارجت" : "Closest to target"}
           items={top}
@@ -889,254 +862,13 @@ function TeamTargetBoard({
       </div>
       <a
         href="/teams"
-        className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-brand hover:underline"
+        className="mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:underline"
       >
         {A
           ? `شوف الفريق كله (${fmtNum(rows.length)} بتارجت)`
           : `See the whole team (${fmtNum(rows.length)} with a target)`}
       </a>
     </div>
-  );
-}
-
-/**
- * Where the ad money went, one row per platform.
- *
- * Colour follows the entity here, not the rank: Meta keeps its blue whatever
- * position it lands in, so a reader who learns the colours once can read the
- * row order without reading the labels. A bar along the bottom edge of the row
- * carries the share; the figure carries the amount.
- */
-const PLATFORM_COLOR: Record<string, string> = {
-  meta: "#0866ff",
-  google: "#ea4335",
-  tiktok: "#00c4bd",
-  snapchat: "#f5bb00",
-  openai: "#10a37f",
-};
-
-function PlatformSpend({
-  spendByPlatform,
-  total,
-  lang,
-}: {
-  spendByPlatform: Record<string, number>;
-  total: number;
-  lang: "ar" | "en";
-}) {
-  const rows = PLATFORMS.map((platform) => ({
-    platform,
-    spend: spendByPlatform[platform] ?? 0,
-  }))
-    .filter((row) => row.spend > 0)
-    .sort((a, b) => b.spend - a.spend);
-
-  return (
-    <div className="card pad-card flex h-full flex-col">
-      <div className="text-[13px] text-text-muted">
-        {lang === "ar" ? "الصرف حسب المنصة" : "Spend by platform"}
-      </div>
-      {rows.length === 0 ? (
-        <p className="mt-4 text-[12px] text-text-subtle">
-          {lang === "ar" ? "مفيش صرف مسجّل للفترة دي" : "No spend recorded for this period"}
-        </p>
-      ) : (
-        <ul className="mt-4 flex flex-1 flex-col gap-3">
-          {rows.map(({ platform, spend }) => {
-            const share = total > 0 ? (spend / total) * 100 : 0;
-            const color = PLATFORM_COLOR[platform] ?? "var(--chart-muted)";
-            return (
-              <li key={platform} className="relative pb-2">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="inline-flex min-w-0 items-center gap-2">
-                    <span
-                      className="size-2 shrink-0 rounded-full"
-                      style={{ background: color }}
-                      aria-hidden="true"
-                    />
-                    <span className="truncate text-[13px] text-text">
-                      {PLATFORM_LABEL[platform][lang]}
-                    </span>
-                  </span>
-                  <span className="num shrink-0 text-[13px] font-medium text-text">
-                    {fmtUSD(spend)}
-                  </span>
-                </div>
-                <div className="absolute inset-x-0 bottom-0 h-[3px] rounded-full bg-surface-2">
-                  <div
-                    className="h-full rounded-full"
-                    style={{ width: `${Math.min(share, 100)}%`, background: color, opacity: 0.75 }}
-                  />
-                </div>
-                <span className="num absolute -top-px end-0 translate-y-full text-[11px] text-text-subtle">
-                  {share < 0.1 ? "<0.1%" : `${share.toFixed(0)}%`}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </div>
-  );
-}
-
-/**
- * The month's headline: the figure, how far along the month is, and the gap
- * between the two. Filled, because it is the one number everything else on
- * the page is context for.
- */
-function TargetHero({
-  detail,
-  sub,
-  achieved,
-  pacePct,
-  lang,
-}: {
-  detail: MetricDetail;
-  sub?: string;
-  achieved: number | null;
-  pacePct: number | null;
-  lang: "ar" | "en";
-}) {
-  const A = lang === "ar";
-  const behind = achieved !== null && pacePct !== null ? achieved < pacePct : null;
-  return (
-    <MetricTriggerShell detail={detail}>
-      {(open) => (
-        <button
-          type="button"
-          onClick={open}
-          data-metric-trigger=""
-          data-testid={`kpi-${detail.id}`}
-          aria-haspopup="dialog"
-          aria-label={A ? `${detail.title} — عرض تفاصيل الرقم` : `${detail.title} — open detail`}
-          className="hero-block flex h-full w-full cursor-pointer flex-col text-start"
-        >
-          <span className="text-[13px] text-text-muted">{detail.title}</span>
-          <span className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="num text-[44px] font-semibold leading-none tracking-[-0.03em] text-brand">
-              {detail.value}
-            </span>
-            {behind !== null && (
-              <span
-                className="num rounded-full px-2 py-0.5 text-[12px] font-medium"
-                style={{
-                  color: behind ? "var(--danger)" : "var(--success)",
-                  background: behind
-                    ? "color-mix(in srgb, var(--danger) 12%, transparent)"
-                    : "color-mix(in srgb, var(--success) 12%, transparent)",
-                }}
-              >
-                {behind
-                  ? A
-                    ? "متأخر عن الإيقاع"
-                    : "behind pace"
-                  : A
-                    ? "قدام الإيقاع"
-                    : "ahead of pace"}
-              </span>
-            )}
-          </span>
-
-          {achieved !== null && (
-            <span className="mt-4 block">
-              <span className="hero-track block">
-                <i style={{ width: `${Math.min(Math.max(achieved, 0), 100)}%` }} />
-                {pacePct !== null && <PaceMark pct={pacePct} lang={lang} />}
-              </span>
-            </span>
-          )}
-
-          {sub && <span className="num mt-3 text-[12px] text-text-muted">{sub}</span>}
-          <span className="mt-auto pt-4 text-[12px] text-text-muted">
-            {A ? "شوف التفاصيل" : "View detail"} ›
-          </span>
-        </button>
-      )}
-    </MetricTriggerShell>
-  );
-}
-
-/** A lead target as a ring: the share done, the count underneath. */
-function LeadGauge({
-  detail,
-  actual,
-  target,
-  blocked,
-  color,
-  lang,
-}: {
-  detail: MetricDetail;
-  actual: number | null;
-  target: number | null;
-  blocked: boolean;
-  color: string;
-  lang: "ar" | "en";
-}) {
-  const pct = !blocked && actual !== null && target ? (actual / target) * 100 : 0;
-  return (
-    <MetricTriggerShell detail={detail}>
-      {(open) => (
-        <button
-          type="button"
-          onClick={open}
-          data-metric-trigger=""
-          data-testid={`kpi-${detail.id}`}
-          aria-haspopup="dialog"
-          aria-label={
-            lang === "ar" ? `${detail.title} — عرض تفاصيل الرقم` : `${detail.title} — open detail`
-          }
-          className="min-w-0 cursor-pointer rounded-xl p-2 transition-colors hover:bg-surface-2"
-        >
-          <Gauge pct={pct} value={detail.value} label={detail.title} color={color} />
-          <span className="num mt-1 block text-[12px] text-text-subtle">
-            {blocked || actual === null || target === null
-              ? lang === "ar"
-                ? "محتاج خطة الشهر"
-                : "needs a monthly plan"
-              : `${fmtNum(actual)} / ${fmtNum(target)}`}
-          </span>
-        </button>
-      )}
-    </MetricTriggerShell>
-  );
-}
-
-/**
- * The share of the month that has gone by, as a percentage, or null when the
- * selected window is not a single month starting on the 1st — in which case
- * there is no honest "should be at" to draw.
- */
-function monthPacePct(from: string | undefined, to: string | undefined): number | null {
-  if (!from || !to) return null;
-  if (from.slice(0, 7) !== to.slice(0, 7) || !from.endsWith("-01")) return null;
-  const [y, m, d] = to.split("-").map(Number);
-  const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
-  if (!days) return null;
-  return (d / days) * 100;
-}
-
-/**
- * The pace tick: a two-pixel mark on a target bar at the point the month has
- * actually reached. A fill that stops short of it is behind; one that runs
- * past it is ahead. It is the same figure the hero card states in words, drawn
- * where the comparison is actually made.
- */
-function PaceMark({ pct, lang }: { pct: number; lang: "ar" | "en" }) {
-  const label =
-    lang === "ar" ? `المفروض لحد النهارده ${pct.toFixed(0)}%` : `Pace today ${pct.toFixed(0)}%`;
-  return (
-    <span
-      className="absolute inset-block-0 w-0.5 rounded-full"
-      style={{
-        insetInlineStart: `${Math.min(Math.max(pct, 0), 100)}%`,
-        top: -2,
-        bottom: -2,
-        background: "var(--accent)",
-      }}
-      title={label}
-      aria-hidden="true"
-    />
   );
 }
 

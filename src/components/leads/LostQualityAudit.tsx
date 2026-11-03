@@ -43,7 +43,7 @@ function AuditGroupPanel({
   return (
     <div className="quality-panel">
       <div className="quality-panel-heading">
-        <h3 className="text-base font-medium text-text">{title}</h3>
+        <h3 className="text-base font-bold text-text">{title}</h3>
         <p className="mt-1 text-xs leading-relaxed text-text-muted">{description}</p>
       </div>
       {shown.length ? (
@@ -51,10 +51,10 @@ function AuditGroupPanel({
           {shown.map((row) => (
             <div key={row.name} className="quality-group-row">
               <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-1">
-                <span className="min-w-0 break-words text-[13px] font-medium text-text">
+                <span className="min-w-0 break-words text-[13px] font-semibold text-text">
                   {row.name}
                 </span>
-                <span className="num shrink-0 text-[13px] font-medium text-rose-strong">
+                <span className="num shrink-0 text-[13px] font-bold text-rose-strong">
                   {fmtNum(row.review)} {ar ? "أُعيدت" : "returned"}
                 </span>
               </div>
@@ -203,7 +203,7 @@ export function LostQualityAudit({ initialMonth }: { initialMonth?: string }) {
         <section className="quality-unavailable" role="status">
           <CircleAlert size={20} aria-hidden="true" />
           <div>
-            <h2 className="font-medium text-text">
+            <h2 className="font-bold text-text">
               {ar ? "القراءة المباشرة للشيت غير متاحة" : "Direct sheet read is unavailable"}
             </h2>
             <p className="mt-1 text-sm leading-relaxed text-text-muted">
@@ -305,10 +305,10 @@ export function LostQualityAudit({ initialMonth }: { initialMonth?: string }) {
           >
             <div className="quality-outcome-grid">
               <article className="quality-outcome-hero">
-                <p className="text-[12px] font-medium text-white/80">
+                <p className="text-[12px] font-semibold text-white/80">
                   {ar ? "إجمالي قرارات Lost المراجَعة" : "Audited Lost decisions"}
                 </p>
-                <strong className="num mt-3 block text-5xl font-medium leading-none text-white">
+                <strong className="num mt-3 block text-5xl font-bold leading-none text-white">
                   {fmtNum(selected.total)}
                 </strong>
                 <div className="quality-outcome-meter mt-6" aria-hidden="true">
@@ -454,7 +454,7 @@ export function LostQualityAudit({ initialMonth }: { initialMonth?: string }) {
             aria-label={ar ? "تقارير Lost المرتبطة" : "Related Lost reports"}
             className="quality-related"
           >
-            <span className="text-xs font-medium text-text-muted">
+            <span className="text-xs font-bold text-text-muted">
               {ar ? "تقارير مرتبطة" : "Related reports"}
             </span>
             <Link to="/leads" search={{ view: "lost", month: data.selectedMonth }}>

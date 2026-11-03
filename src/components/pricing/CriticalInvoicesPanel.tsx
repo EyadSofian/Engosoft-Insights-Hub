@@ -93,7 +93,7 @@ export function CriticalInvoicesPanel({
       >
         <h2
           id="critical-invoices-heading"
-          className="flex items-center gap-2 text-[13px] font-medium text-text"
+          className="flex items-center gap-2 text-[13px] font-bold text-text"
         >
           <TriangleAlert size={16} style={{ color: "var(--danger)" }} aria-hidden="true" />
           {ar ? "فواتير تحتاج تدخّلًا اليوم" : "Invoices needing action today"}
@@ -119,7 +119,7 @@ export function CriticalInvoicesPanel({
               className="grid gap-x-4 gap-y-1.5 px-3.5 py-2.5 sm:px-4 lg:grid-cols-[minmax(140px,0.85fr)_minmax(200px,1.3fr)_minmax(190px,1fr)_auto] lg:items-center"
             >
               <div className="min-w-0">
-                <div className="truncate text-[12.5px] font-medium text-text">
+                <div className="truncate text-[12.5px] font-semibold text-text">
                   <bdi>{row.salesperson || (ar ? "بدون موظف محدد" : "No salesperson")}</bdi>
                 </div>
                 <div className="num text-[12px] text-text-subtle">
@@ -156,7 +156,7 @@ export function CriticalInvoicesPanel({
                 <button
                   type="button"
                   onClick={() => setOpenInvoice(row.invoiceNumber)}
-                  className="inline-flex min-h-8 cursor-pointer items-center rounded-lg border border-border px-2.5 text-[12px] font-medium text-text transition-colors hover:bg-surface-2"
+                  className="inline-flex min-h-8 cursor-pointer items-center rounded-lg border border-border px-2.5 text-[12px] font-semibold text-text transition-colors hover:bg-surface-2"
                 >
                   {ar ? "التفاصيل" : "Details"}
                 </button>
@@ -164,7 +164,7 @@ export function CriticalInvoicesPanel({
                   type="button"
                   onClick={() => void openInOdoo(row.invoiceNumber)}
                   disabled={openingOdoo === row.invoiceNumber}
-                  className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium text-white transition-opacity disabled:opacity-55"
+                  className="inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-semibold text-white transition-opacity disabled:opacity-55"
                   style={{ background: "var(--ink)" }}
                 >
                   <ExternalLink size={12} aria-hidden="true" />

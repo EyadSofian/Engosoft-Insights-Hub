@@ -109,22 +109,13 @@ export function toneVars(tone: AnyTone | undefined): React.CSSProperties {
   } as React.CSSProperties;
 }
 
-/**
- * A metric card's variables.
- *
- * The card used to take its family end to end: a pastel ground, a matching
- * hairline and the family's own dark tone for the figure. Five cards in five
- * pastels read as five verdicts, and a reader scanning the row cannot tell
- * which figure the screen wants them to look at first. The ground and the
- * hairline go neutral; the family survives in `--tone-strong`, for the few
- * marks that genuinely encode a category.
- */
+/** Soft per-metric color with one dedicated cobalt featured state. */
 export function solidCardVars(tone: AnyTone | undefined): React.CSSProperties {
   const t = toneOf(tone);
   return {
-    "--tone-surface": "var(--surface)",
-    "--tone-border": "var(--border)",
-    "--tone-ink": "var(--text)",
+    "--tone-surface": t.surface,
+    "--tone-border": t.border,
+    "--tone-ink": t.ink,
     "--tone-strong": t.strong,
   } as React.CSSProperties;
 }

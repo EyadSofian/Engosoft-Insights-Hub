@@ -1088,7 +1088,9 @@ function Organic() {
                     <Sprout size={22} />
                   </span>
                   <div>
-                    <div className="text-[12px] font-medium text-success">Organic pulse</div>
+                    <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-success">
+                      Organic pulse
+                    </div>
                     <div className="text-xs text-text-muted">
                       {fmtNum(data.counts.sources)}{" "}
                       {lang === "ar" ? "مصدر غير مدفوع" : "non-paid sources"}
@@ -1149,7 +1151,9 @@ function Organic() {
                     className="rounded-2xl border border-border p-3.5"
                     style={{ background: "var(--surface-2)" }}
                   >
-                    <div className="text-[12px] font-medium text-text-subtle">{item.label}</div>
+                    <div className="text-[12px] font-medium uppercase tracking-wide text-text-subtle">
+                      {item.label}
+                    </div>
                     <div className="num mt-2 text-xl font-semibold text-text">{item.value}</div>
                   </div>
                 ))}
@@ -1309,8 +1313,8 @@ function Organic() {
             >
               {lang === "ar" ? "من أين يأتي الأورجانيك؟" : "Where does Organic come from?"}
             </SectionTitle>
-            <div className="mb-3 dash-grid">
-              <Card className="col-7">
+            <div className="mb-3 card-grid xl:grid-cols-2">
+              <Card>
                 <SectionTitle
                   hint={lang === "ar" ? "مرتب حسب عدد الليدز" : "ranked by lead volume"}
                 >
@@ -1325,7 +1329,7 @@ function Organic() {
                   showValues
                 />
               </Card>
-              <Card className="col-5">
+              <Card>
                 <SectionTitle hint={lang === "ar" ? "من الفواتير المدفوعة" : "from paid invoices"}>
                   {lang === "ar" ? "الإيراد حسب المصدر" : "Revenue by source"}
                 </SectionTitle>

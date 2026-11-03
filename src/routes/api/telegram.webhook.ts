@@ -2,13 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 interface Update {
   message?: {
-    chat?: {
-      id?: number | string;
-      type?: string;
-      title?: string;
-      first_name?: string;
-      username?: string;
-    };
+    chat?: { id?: number | string; type?: string; title?: string; first_name?: string; username?: string };
     from?: { first_name?: string; username?: string };
     text?: string;
   };
@@ -29,8 +23,9 @@ export const Route = createFileRoute("/api/telegram/webhook")({
     handlers: {
       POST: async ({ request }) => {
         const { buildReport, sendMessage, esc } = await import("@/lib/telegram.server");
-        const { subscribe, unsubscribe, isSubscribed, subscriberCount } =
-          await import("@/lib/subscribers.server");
+        const { subscribe, unsubscribe, isSubscribed, subscriberCount } = await import(
+          "@/lib/subscribers.server"
+        );
         const { json } = await import("@/lib/api.server");
 
         let update: Update;
@@ -49,11 +44,7 @@ export const Route = createFileRoute("/api/telegram/webhook")({
         // Telegram appends @botname to commands in group chats.
         const command = text.split(/\s+/)[0].split("@")[0].toLowerCase();
         const displayName =
-          msg?.chat?.title ||
-          msg?.from?.first_name ||
-          msg?.chat?.first_name ||
-          msg?.from?.username ||
-          undefined;
+          msg?.chat?.title || msg?.from?.first_name || msg?.chat?.first_name || msg?.from?.username || undefined;
 
         try {
           switch (command) {
@@ -106,17 +97,10 @@ export const Route = createFileRoute("/api/telegram/webhook")({
             }
 
             case "/status": {
-              const [subscribed, count] = await Promise.all([
-                isSubscribed(chatId),
-                subscriberCount(),
-              ]);
+              const [subscribed, count] = await Promise.all([isSubscribed(chatId), subscriberCount()]);
               await sendMessage(
                 [
-                  esc(
-                    subscribed
-                      ? "أنت مشترك في النشرة اليومية."
-                      : "أنت غير مشترك. أرسل /start للاشتراك.",
-                  ),
+                  esc(subscribed ? "أنت مشترك في النشرة اليومية." : "أنت غير مشترك. أرسل /start للاشتراك."),
                   esc(`عدد المشتركين حالياً: ${count}`),
                 ].join("\n"),
                 chatId,

@@ -12,7 +12,7 @@ import { SourceBadges } from "./SourceBadges";
 export function TableMessage({ message, lang }: { message: TableMessageType; lang: "ar" | "en" }) {
   return (
     <div className="rounded-xl border border-border bg-bg-subtle p-3" data-testid="nexus-table">
-      {message.title && <h4 className="mb-2 text-xs font-medium text-text">{message.title}</h4>}
+      {message.title && <h4 className="mb-2 text-xs font-semibold text-text">{message.title}</h4>}
       <div className="-mx-1 overflow-x-auto px-1">
         <table className="w-full min-w-max text-[12px]">
           <thead>

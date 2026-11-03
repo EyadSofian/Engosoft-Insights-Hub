@@ -117,7 +117,7 @@ function Stage({
           <span className="truncate">{label}</span>
           <MetricInfo metric={metric} size={12} />
         </span>
-        <span className="num text-[13px] font-medium text-text shrink-0">{value}</span>
+        <span className="num text-[13px] font-semibold text-text shrink-0">{value}</span>
       </div>
       <div className="h-6 rounded-lg bg-surface-2 overflow-hidden">
         <div

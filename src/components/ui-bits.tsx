@@ -71,18 +71,13 @@ export function DeltaBadge({ value, invert = false }: { value?: number; invert?:
   // For cost metrics a rise is bad, so `invert` flips the colour, not the arrow.
   const good = invert ? value < 0 : value > 0;
   const color = flat ? "var(--text-subtle)" : good ? "var(--success)" : "var(--danger)";
-  const bg = flat
-    ? "var(--surface-2)"
-    : good
-      ? "color-mix(in srgb, var(--success) 12%, transparent)"
-      : "color-mix(in srgb, var(--danger) 12%, transparent)";
   const Icon = flat ? Minus : value > 0 ? ArrowUpRight : ArrowDownRight;
 
   return (
     <span
-      className="delta-badge num inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[12px] font-medium"
+      className="delta-badge inline-flex items-center gap-0.5 text-[12px] font-semibold num"
       data-good={flat ? undefined : String(good)}
-      style={{ color, background: bg }}
+      style={{ color }}
       title={t("vs_prev")}
     >
       <Icon size={12} strokeWidth={2.5} />
@@ -224,7 +219,7 @@ export function KpiCard({
     return (
       <div
         className={`tone-surface kpi-solid @container pad-card relative h-full overflow-hidden ${
-          compact ? "min-h-[104px]" : "min-h-[124px]"
+          compact ? "min-h-[132px]" : "min-h-[208px] sm:min-h-[220px]"
         }`}
         style={solidCardVars(tone)}
         aria-busy="true"
@@ -252,10 +247,9 @@ export function KpiCard({
       data-testid={testId}
       data-hero={hero ? "" : undefined}
       data-compact={compact ? "" : undefined}
-      title={typeof description === "string" ? description : undefined}
       className={`tone-surface kpi-solid stagger @container relative flex h-full w-full flex-col overflow-hidden text-start ${
-        interactive ? "kpi-card cursor-pointer" : ""
-      } ${compact ? "min-h-[104px]" : "min-h-[124px]"}`}
+        interactive ? "kpi-card lift cursor-pointer" : ""
+      } ${compact ? "min-h-[132px]" : "min-h-[208px] sm:min-h-[220px]"}`}
       style={
         {
           ...solidCardVars(tone),
@@ -267,27 +261,35 @@ export function KpiCard({
         <div className="relative flex items-start justify-between gap-3">
           <span className="inline-flex min-w-0 items-start gap-1.5">
             <span
-              className={`kpi-label font-normal leading-[1.4] ${compact ? "line-clamp-2 text-[12px]" : "line-clamp-1 text-[13px]"}`}
-              style={{ color: "var(--text-muted)" }}
+              className={`kpi-label font-semibold leading-[1.4] ${compact ? "line-clamp-3 text-[12px]" : "line-clamp-2 text-[12.5px] sm:text-[13px]"}`}
+              style={{ color: "var(--tone-ink)" }}
             >
               {label}
             </span>
             {info}
           </span>
-          {/* The icon chip is gone. A coloured tile in the corner of every
-            card is decoration: it repeats what the label already says and
-            gives five cards five more colours to compete in. */}
+          {icon && (
+            <span
+              className={`kpi-icon grid shrink-0 place-items-center rounded-xl ${compact ? "size-7" : "size-9"}`}
+              style={{
+                background: "color-mix(in srgb, var(--tone-strong) 13%, var(--surface))",
+                color: "var(--tone-strong)",
+              }}
+            >
+              {icon}
+            </span>
+          )}
         </div>
 
         {/* Label to figure: 11px. Close enough to read as one unit, far enough
           that the figure is the thing the eye lands on. */}
         <div
-          className={`num kpi-figure relative max-w-full min-w-0 font-semibold ${
-            compact ? "mt-1 text-[24px]" : "mt-1.5 text-[28px] sm:text-[30px]"
+          className={`num kpi-figure relative max-w-full min-w-0 font-bold ${
+            compact ? "mt-1.5" : "mt-[11px]"
           } ${
             valueWrap
-              ? "overflow-visible whitespace-normal leading-[1.15]"
-              : "overflow-hidden text-ellipsis whitespace-nowrap leading-none"
+              ? "overflow-visible whitespace-normal text-[clamp(0.8rem,12cqi,1.9rem)] leading-[1.15]"
+              : "overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(0.8rem,13cqi,2.4rem)] leading-none"
           }`}
           style={{ color: "var(--tone-ink)" }}
         >
@@ -307,8 +309,8 @@ export function KpiCard({
             {sub != null && (
               <span
                 title={typeof sub === "string" ? sub : undefined}
-                className={`kpi-context min-w-0 leading-[1.5] text-[12px] ${
-                  subWrap ? "leading-relaxed line-clamp-2" : "line-clamp-1"
+                className={`kpi-context min-w-0 leading-[1.5] ${compact ? "line-clamp-2 text-[12px]" : "text-[12.5px]"} ${
+                  subWrap ? "leading-relaxed" : "line-clamp-3"
                 }`}
                 style={{ color: "var(--text-muted)" }}
               >
@@ -318,29 +320,34 @@ export function KpiCard({
           </div>
         )}
 
-        {/* The explanation lives in the tile's tooltip, not on a sub-line. A
-          row of tiles each carrying two sentences stops reading as figures and
-          starts reading as a paragraph — which is what made this strip feel
-          like a wall of boxed text. */}
+        {description && !compact && (
+          <p
+            className="relative mt-2.5 line-clamp-2 text-[12px] leading-relaxed text-text-muted"
+            title={description}
+          >
+            {description}
+          </p>
+        )}
 
         {/* The foot of the card. `mt-auto` is what makes a row of cards line up
           along the bottom as well as the top, whatever length of explanation
           each one carries. */}
-        {/* No sparkline. A stat card is a label, a figure and a change with
-          what it compares to; a 68x26 curve in the corner is a chart too small
-          to read that pulls the eye off the number it belongs to. The same
-          series is drawn properly in the trend chart below. */}
-        {interactive && (
-          <div className="relative mt-auto flex items-end justify-between gap-2 pt-3">
-            <span
-              className="kpi-cue inline-flex items-center gap-0.5 text-[12px] font-normal"
-              style={{ color: "var(--text-muted)" }}
-            >
-              {cue}
-              <span className="kpi-cue-arrow inline-flex" aria-hidden="true">
-                {lang === "ar" ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
+        {(interactive || (!compact && spark)) && (
+          <div className="relative mt-auto flex items-end justify-between gap-2 pt-2.5">
+            {interactive ? (
+              <span
+                className="kpi-cue inline-flex items-center gap-0.5 text-[12px] font-bold"
+                style={{ color: "var(--tone-ink)" }}
+              >
+                {cue}
+                <span className="kpi-cue-arrow inline-flex" aria-hidden="true">
+                  {lang === "ar" ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
+                </span>
               </span>
-            </span>
+            ) : (
+              <span />
+            )}
+            {!compact && <Sparkline points={spark} color="var(--tone-strong)" />}
           </div>
         )}
       </div>
@@ -475,7 +482,7 @@ export function FunnelBars({
                 {rate !== null && (
                   <span className="num text-[12px] text-text-subtle">{rate.toFixed(1)}%</span>
                 )}
-                <span className="num text-[13px] font-medium text-text">{s.display}</span>
+                <span className="num text-[13px] font-semibold text-text">{s.display}</span>
               </div>
             </div>
             <div className="h-7 rounded-lg bg-surface-2 overflow-hidden">
@@ -506,7 +513,7 @@ export function KpiSkeletonGrid({ count = 8 }: { count?: number }) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
       {Array.from({ length: count }).map((_, i) => (
-        <Skeleton key={i} className="h-[96px] sm:h-[120px]" />
+        <Skeleton key={i} className="h-[96px] sm:h-[118px]" />
       ))}
     </div>
   );

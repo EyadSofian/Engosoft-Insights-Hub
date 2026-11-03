@@ -349,7 +349,7 @@ function Acquisition() {
                   setGrainFilter({});
                   go("ads", "campaigns");
                 }}
-                className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-[13px] font-medium text-brand hover:bg-brand-soft"
+                className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold text-brand hover:bg-brand-soft"
               >
                 {A ? "تتبّع من الحملة للمادة" : "Drill down from campaign to creative"}
                 {A ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}

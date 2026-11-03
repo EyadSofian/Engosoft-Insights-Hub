@@ -101,7 +101,7 @@ function StatusPill({ status, lang }: { status: ReconciliationStatus; lang: "ar"
   const style = STATUS_STYLE[status];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium ${style.pill}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-semibold ${style.pill}`}
     >
       {style.icon}
       {STATUS_TEXT[status][lang]}
@@ -139,7 +139,9 @@ function CheckRow({ item, lang }: { item: ReconciliationCheck; lang: "ar" | "en"
         className="flex w-full min-h-12 flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 text-start hover:bg-surface-2 sm:px-5"
       >
         <span className={`size-2 shrink-0 rounded-full ${STATUS_STYLE[item.status].dot}`} />
-        <span className="min-w-0 flex-1 text-[13px] font-medium text-text">{item.label[lang]}</span>
+        <span className="min-w-0 flex-1 text-[13px] font-semibold text-text">
+          {item.label[lang]}
+        </span>
         <span className="num shrink-0 text-[13px] text-text-muted">
           {value(item.dashboardValue, item.unit)}
         </span>
@@ -194,7 +196,7 @@ function CheckRow({ item, lang }: { item: ReconciliationCheck; lang: "ar" | "en"
           {item.unavailableReason && <Notice tone="warning">{item.unavailableReason}</Notice>}
 
           <details className="group">
-            <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-[12.5px] font-medium text-text-muted hover:text-text [&::-webkit-details-marker]:hidden">
+            <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-[12.5px] font-semibold text-text-muted hover:text-text [&::-webkit-details-marker]:hidden">
               <ChevronDown
                 size={14}
                 className="transition-transform group-open:rotate-180"
@@ -371,7 +373,7 @@ function NumberReview() {
               );
             }}
             disabled={isFetching}
-            className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-surface-2 px-3 text-[13px] font-medium text-text ring-1 ring-border hover:bg-surface-3 disabled:opacity-60"
+            className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-surface-2 px-3 text-[13px] font-semibold text-text ring-1 ring-border hover:bg-surface-3 disabled:opacity-60"
           >
             <RefreshCw size={15} className={isFetching ? "animate-spin" : ""} aria-hidden="true" />
             {A ? "راجع تاني" : "Check again"}

@@ -540,7 +540,7 @@ function TodaySection({ data, loading, A }: SectionProps) {
         </KpiRow>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <Card padded>
-            <div className="mb-1 text-xs font-medium text-text-muted">
+            <div className="mb-1 text-xs font-semibold text-text-muted">
               {A ? "أعلى حملة" : "Top campaign"}
             </div>
             {top(
@@ -550,7 +550,7 @@ function TodaySection({ data, loading, A }: SectionProps) {
             )}
           </Card>
           <Card padded>
-            <div className="mb-1 text-xs font-medium text-text-muted">
+            <div className="mb-1 text-xs font-semibold text-text-muted">
               {A ? "أعلى مادة إعلانية" : "Top creative"}
             </div>
             {top(
@@ -560,7 +560,7 @@ function TodaySection({ data, loading, A }: SectionProps) {
             )}
           </Card>
           <Card padded>
-            <div className="mb-1 text-xs font-medium text-text-muted">
+            <div className="mb-1 text-xs font-semibold text-text-muted">
               {A ? "أعلى صفحة هبوط" : "Top landing page"}
             </div>
             {today?.topLandingPage ? (
@@ -578,7 +578,7 @@ function TodaySection({ data, loading, A }: SectionProps) {
             )}
           </Card>
           <Card padded>
-            <div className="mb-1 text-xs font-medium text-text-muted">
+            <div className="mb-1 text-xs font-semibold text-text-muted">
               {A ? "أعلى نموذج Meta" : "Top Meta lead form"}
             </div>
             {today?.topMetaLeadForm ? (
@@ -596,7 +596,7 @@ function TodaySection({ data, loading, A }: SectionProps) {
             )}
           </Card>
           <Card padded>
-            <div className="mb-1 text-xs font-medium text-text-muted">
+            <div className="mb-1 text-xs font-semibold text-text-muted">
               {A ? "صرف Meta اليوم" : "Meta spend today"}
             </div>
             <div className="text-sm font-semibold text-text">{money(k?.spend)}</div>
@@ -611,7 +611,7 @@ function TodaySection({ data, loading, A }: SectionProps) {
             </div>
           </Card>
           <Card padded>
-            <div className="mb-1 text-xs font-medium text-text-muted">
+            <div className="mb-1 text-xs font-semibold text-text-muted">
               {A ? "تكلفة الاستحواذ الدقيق" : "Cost per exact acquisition"}
             </div>
             <div className="text-sm font-semibold text-text">
@@ -1029,13 +1029,13 @@ function MessagingAcquisition({ data, loading, A }: SectionProps) {
         </KpiRow>
         <div className="grid gap-3 lg:grid-cols-2">
           <Card padded>
-            <div className="mb-2 text-xs font-medium text-text-muted">
+            <div className="mb-2 text-xs font-semibold text-text-muted">
               {A ? "حسب القناة" : "By channel"}
             </div>
             <HBarChart data={channels} format={fmtNum} height={180} showValues />
           </Card>
           <Card padded>
-            <div className="mb-2 text-xs font-medium text-text-muted">
+            <div className="mb-2 text-xs font-semibold text-text-muted">
               {A ? "حسب نوع المصدر" : "By source type"}
             </div>
             <div className="divide-y divide-border text-sm">
@@ -1056,7 +1056,7 @@ function MessagingAcquisition({ data, loading, A }: SectionProps) {
         <div className="grid gap-3 md:grid-cols-2">
           {tops.map((item) => (
             <Card padded key={item.id}>
-              <div className="mb-2 text-xs font-medium text-text-muted">{item.title}</div>
+              <div className="mb-2 text-xs font-semibold text-text-muted">{item.title}</div>
               {item.data.length ? (
                 <HBarChart
                   data={item.data}

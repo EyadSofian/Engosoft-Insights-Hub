@@ -185,11 +185,11 @@ export function TargetEditor({
         className="w-full sm:max-w-3xl overflow-y-auto p-0"
       >
         <SheetHeader className="border-b border-border bg-brand-soft/40 p-4 sm:p-6">
-          <div className="flex items-center gap-2 text-xs font-medium text-brand">
+          <div className="flex items-center gap-2 text-xs font-semibold text-brand">
             <Target size={16} />
             <span>{lang === "ar" ? "إدارة التارجت" : "Manage targets"}</span>
           </div>
-          <SheetTitle className="mt-1 text-xl font-medium text-text">
+          <SheetTitle className="mt-1 text-xl font-bold text-text">
             {lang === "ar" ? "تارجت الموظفين الشهري" : "Monthly employee targets"}
           </SheetTitle>
           <SheetDescription className="text-sm text-text-muted">
@@ -318,7 +318,7 @@ export function TargetEditor({
           {!loading && !!data && (
             <div className="table-wrap scroll-hint-x rounded-2xl border border-border">
               <table className="w-full min-w-[560px] text-sm">
-                <thead className="bg-surface-2 text-[12px] text-text-muted">
+                <thead className="bg-surface-2 text-[12px] uppercase tracking-wide text-text-muted">
                   <tr>
                     <th className="px-3 py-2.5 text-start">
                       {lang === "ar" ? "الموظف" : "Employee"}
@@ -363,10 +363,10 @@ export function TargetEditor({
                 </tbody>
                 <tfoot className="border-t-2 border-border bg-surface-2">
                   <tr>
-                    <td className="px-3 py-2.5 text-xs font-medium text-text" colSpan={2}>
+                    <td className="px-3 py-2.5 text-xs font-semibold text-text" colSpan={2}>
                       {lang === "ar" ? "إجمالي التارجت" : "Total target"}
                     </td>
-                    <td className="num px-3 py-2.5 text-end text-sm font-medium text-text">
+                    <td className="num px-3 py-2.5 text-end text-sm font-bold text-text">
                       {fmtUSDFull(total)}
                     </td>
                   </tr>

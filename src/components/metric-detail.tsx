@@ -86,11 +86,11 @@ export function MetricDetailHeader({
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <div className="text-[12px] font-medium" style={{ color: t.ink, opacity: 0.78 }}>
+        <div className="text-[12px] font-semibold" style={{ color: t.ink, opacity: 0.78 }}>
           {title}
         </div>
         <div
-          className="num mt-1 text-[26px] font-medium leading-none tracking-[-0.03em]"
+          className="num mt-1 text-[26px] font-bold leading-none tracking-[-0.03em]"
           style={{ color: t.ink }}
         >
           {value}
@@ -135,7 +135,7 @@ export function MetricFiltersSummary({
     >
       {chips.map((chip) => (
         <div key={chip.key} className="flex min-w-0 items-baseline gap-1.5">
-          <dt className="text-[12px] font-medium text-text-subtle">{chip.label}:</dt>
+          <dt className="text-[12px] font-semibold text-text-subtle">{chip.label}:</dt>
           <dd className="text-[12px] font-medium text-text">
             <bdi>{chip.value}</bdi>
           </dd>
@@ -198,7 +198,7 @@ export function MetricDefinition({
             onClick={() => setOpen((o) => !o)}
             aria-expanded={open}
             aria-controls={id}
-            className="mt-2 inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 text-[12px] font-medium text-text-muted transition-colors hover:bg-surface-2 hover:text-text"
+            className="mt-2 inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 text-[12px] font-semibold text-text-muted transition-colors hover:bg-surface-2 hover:text-text"
           >
             <Sigma size={12} aria-hidden="true" />
             {lang === "ar" ? "اتحسب إزاي؟" : "How it is calculated"}
@@ -250,17 +250,19 @@ export function MetricProvenance({
           </span>
           <dl className="grid min-w-0 flex-1 gap-x-5 gap-y-2 sm:grid-cols-2">
             <div>
-              <dt className="text-[12px] font-medium text-text-subtle">
+              <dt className="text-[12px] font-bold uppercase tracking-[0.08em] text-text-subtle">
                 {lang === "ar" ? "السيستم" : "System"}
               </dt>
-              <dd className="mt-0.5 text-[12px] font-medium text-text">{provenance.system}</dd>
+              <dd className="mt-0.5 text-[12px] font-semibold text-text">{provenance.system}</dd>
             </div>
             {provenance.model && (
               <div>
-                <dt className="text-[12px] font-medium text-text-subtle">
+                <dt className="text-[12px] font-bold uppercase tracking-[0.08em] text-text-subtle">
                   {lang === "ar" ? "الجدول" : "Model"}
                 </dt>
-                <dd className="num mt-0.5 text-[12px] font-medium text-text">{provenance.model}</dd>
+                <dd className="num mt-0.5 text-[12px] font-semibold text-text">
+                  {provenance.model}
+                </dd>
               </div>
             )}
           </dl>
@@ -269,7 +271,7 @@ export function MetricProvenance({
         <div className="space-y-3 px-3.5 py-3">
           {provenance.query && (
             <div>
-              <div className="mb-1 text-[12px] font-medium text-text-subtle">
+              <div className="mb-1 text-[12px] font-bold text-text-subtle">
                 {lang === "ar" ? "مين بيتحسب في الرقم" : "Record inclusion rule"}
               </div>
               <code
@@ -283,7 +285,7 @@ export function MetricProvenance({
 
           {provenance.fields && provenance.fields.length > 0 && (
             <div>
-              <div className="mb-1.5 text-[12px] font-medium text-text-subtle">
+              <div className="mb-1.5 text-[12px] font-bold text-text-subtle">
                 {lang === "ar" ? "الخانات اللي اتاخدت من Odoo" : "Odoo fields used"}
               </div>
               <div className="flex flex-wrap gap-1.5">
@@ -291,7 +293,7 @@ export function MetricProvenance({
                   <span
                     key={field}
                     dir="ltr"
-                    className="num rounded-lg border border-border bg-surface px-2 py-1 text-[12px] font-medium text-text-muted"
+                    className="num rounded-lg border border-border bg-surface px-2 py-1 text-[12px] font-semibold text-text-muted"
                   >
                     {field}
                   </span>
@@ -302,7 +304,7 @@ export function MetricProvenance({
 
           {provenance.dateBasis && (
             <p className="text-[12px] leading-5 text-text-muted">
-              <span className="font-medium text-text">
+              <span className="font-bold text-text">
                 {lang === "ar" ? "بنحسب بتاريخ: " : "Period basis: "}
               </span>
               {provenance.dateBasis}
@@ -402,7 +404,7 @@ export function MetricBreakdown({ group }: { group: MetricBreakdownGroup }) {
                   <span className="min-w-0 truncate text-[12.5px] text-text" title={row.label}>
                     {row.label}
                   </span>
-                  <span className="num shrink-0 text-[12.5px] font-medium text-text">
+                  <span className="num shrink-0 text-[12.5px] font-semibold text-text">
                     {row.display}
                   </span>
                 </div>
@@ -429,7 +431,7 @@ export function MetricBreakdown({ group }: { group: MetricBreakdownGroup }) {
         <Link
           to={group.moreTo}
           search={group.moreSearch as never}
-          className="mt-2.5 inline-flex items-center gap-1 text-[12px] font-medium text-brand hover:underline"
+          className="mt-2.5 inline-flex items-center gap-1 text-[12px] font-bold text-brand hover:underline"
         >
           {group.moreLabel ?? (lang === "ar" ? "شوف الكل" : "View all")}
           {lang === "ar" ? <ChevronLeft size={13} /> : <ChevronRight size={13} />}
@@ -485,7 +487,7 @@ export function MetricRecords({ records }: { records: NonNullable<MetricDetail["
               </div>
               <div className="shrink-0 text-end">
                 {row.value && (
-                  <div className="num text-[12.5px] font-medium text-text">{row.value}</div>
+                  <div className="num text-[12.5px] font-semibold text-text">{row.value}</div>
                 )}
                 {row.meta && <div className="text-[12px] text-text-muted">{row.meta}</div>}
               </div>
@@ -509,8 +511,8 @@ function MetricSupporting({ facts }: { facts: NonNullable<MetricDetail["supporti
       <div className="grid grid-cols-2 gap-2">
         {facts.map((fact) => (
           <div key={fact.key} className="rounded-xl border border-border bg-surface-2/60 px-3 py-2">
-            <div className="text-[12px] font-medium text-text-subtle">{fact.label}</div>
-            <div className="num mt-0.5 text-[14px] font-medium text-text">{fact.value}</div>
+            <div className="text-[12px] font-semibold text-text-subtle">{fact.label}</div>
+            <div className="num mt-0.5 text-[14px] font-bold text-text">{fact.value}</div>
             {fact.hint && <div className="mt-0.5 text-[12px] text-text-muted">{fact.hint}</div>}
           </div>
         ))}
@@ -568,7 +570,7 @@ export function MetricNexusAction({
         type="button"
         onClick={() => ask()}
         data-testid={`metric-ask-nexus-${elementId}`}
-        className="inline-flex min-h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-3 text-[12.5px] font-medium text-white transition-opacity hover:opacity-90"
+        className="inline-flex min-h-10 w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-3 text-[12.5px] font-bold text-white transition-opacity hover:opacity-90"
         style={{ background: "var(--brand)" }}
       >
         <Sparkles size={14} aria-hidden="true" />
@@ -597,7 +599,9 @@ export function MetricNexusAction({
 function SectionLabel({ children, hint }: { children: ReactNode; hint?: string }) {
   return (
     <div className="mb-2">
-      <h3 className="text-[12px] font-medium text-text-subtle">{children}</h3>
+      <h3 className="text-[12px] font-bold uppercase tracking-[0.06em] text-text-subtle">
+        {children}
+      </h3>
       {hint && <p className="mt-0.5 text-[12px] leading-snug text-text-muted">{hint}</p>}
     </div>
   );
@@ -646,7 +650,7 @@ export function MetricDetailSheet({
             search={detail.report.search as never}
             onClick={onClose}
             data-testid="metric-open-report"
-            className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-[12.5px] font-medium text-text transition-colors hover:bg-surface-2"
+            className="inline-flex min-h-10 w-full items-center justify-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-[12.5px] font-bold text-text transition-colors hover:bg-surface-2"
           >
             {detail.report.label}
             <ArrowUpRight size={14} aria-hidden="true" />

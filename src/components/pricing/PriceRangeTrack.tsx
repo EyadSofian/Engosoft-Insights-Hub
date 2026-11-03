@@ -99,7 +99,7 @@ export function PriceRangeTrack({
       >
         {/* End values sit above their own ends of the band and stay in Latin
             digits in both languages, so two rows of figures line up. */}
-        <div className="flex items-baseline justify-between gap-2 text-[12px] font-medium">
+        <div className="flex items-baseline justify-between gap-2 text-[12px] font-semibold">
           <span className="num text-text-muted">{fmtCompactMoney(low)}</span>
           {!fixed && <span className="num text-text">{fmtCompactMoney(high)}</span>}
         </div>
@@ -135,7 +135,7 @@ export function PriceRangeTrack({
              * shift follows the page direction rather than assuming left.
              */
             <span
-              className="absolute top-[13px] whitespace-nowrap text-[12px] font-medium leading-none"
+              className="absolute top-[13px] whitespace-nowrap text-[12px] font-bold leading-none"
               style={{
                 insetInlineStart: `${pct(marker.value)}%`,
                 transform: ar ? "translateX(50%)" : "translateX(-50%)",
@@ -161,7 +161,7 @@ export function PriceRangeTrack({
 
 function TrackLabel({ label, Icon }: { label: string; Icon?: LucideIcon }) {
   return (
-    <div className="flex items-center gap-1.5 text-[12px] font-medium text-text-subtle">
+    <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
       {Icon && <Icon size={12} aria-hidden="true" />}
       <span className="truncate">{label}</span>
     </div>

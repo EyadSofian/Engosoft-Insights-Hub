@@ -119,17 +119,17 @@ function ChannelCard({
           >
             {icon}
           </span>
-          <span className="text-[12px] font-medium text-text-subtle">↗</span>
+          <span className="text-[12px] font-bold text-text-subtle">↗</span>
         </div>
-        <p className="mt-3 truncate text-[12px] font-medium text-text" title={label}>
+        <p className="mt-3 truncate text-[12px] font-bold text-text" title={label}>
           {label}
         </p>
-        <p className="mt-1 text-lg font-medium tracking-tight text-text">{value}</p>
+        <p className="mt-1 text-lg font-black tracking-tight text-text">{value}</p>
         <p className={`mt-1 text-[12px] ${connected ? "text-text-muted" : "text-text-subtle"}`}>
           {detail}
         </p>
         {!connected && (
-          <p className="mt-2 text-[12px] font-medium text-text-subtle">
+          <p className="mt-2 text-[12px] font-semibold text-text-subtle">
             {lang === "ar" ? "المصدر غير متصل" : "Source not connected"}
           </p>
         )}

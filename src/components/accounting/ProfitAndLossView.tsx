@@ -118,7 +118,7 @@ function AccountExplorer({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h3 className="text-base font-medium text-text">
+          <h3 className="text-base font-bold text-text">
             {section === "expenses"
               ? lang === "ar"
                 ? "بنود المصروفات"
@@ -173,7 +173,7 @@ function AccountExplorer({
                   <span className="truncate font-semibold text-text" title={group.name}>
                     {group.name}
                   </span>
-                  <span className="num shrink-0 font-medium text-text">{usd(group.value)}</span>
+                  <span className="num shrink-0 font-bold text-text">{usd(group.value)}</span>
                 </div>
                 <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-border">
                   <div
@@ -203,7 +203,7 @@ function AccountExplorer({
                       ? fmtPct((Math.abs(group.value) / sectionTotal) * 100, 1)
                       : "—"}
                   </span>
-                  <span className="num shrink-0 text-sm font-medium text-text">
+                  <span className="num shrink-0 text-sm font-bold text-text">
                     {usd(group.value)}
                   </span>
                 </summary>
@@ -314,7 +314,7 @@ function LedgerPanel({
                       </div>
                     </div>
                     <div className="text-end">
-                      <div className="num text-sm font-medium text-text">
+                      <div className="num text-sm font-bold text-text">
                         {nativeMoney(entry.balance, entry.companyCurrency)}
                       </div>
                       <div className="mt-1 text-[12px] text-text-muted">
@@ -330,7 +330,7 @@ function LedgerPanel({
                       href={`https://engosoft.com/web#id=${entry.moveId}&model=account.move&view_type=form`}
                       target="_blank"
                       rel="noreferrer"
-                      className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline"
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline"
                     >
                       {lang === "ar" ? "فتح القيد في Odoo" : "Open in Odoo"}{" "}
                       <ArrowUpRight size={13} />
@@ -352,7 +352,7 @@ function LedgerPanel({
                   type="button"
                   disabled={page <= 1}
                   onClick={() => setPage(page - 1)}
-                  className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-border px-3 text-xs font-medium text-text disabled:opacity-40"
+                  className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-border px-3 text-xs font-semibold text-text disabled:opacity-40"
                 >
                   <ChevronRight size={15} />
                   {lang === "ar" ? "السابق" : "Previous"}
@@ -361,7 +361,7 @@ function LedgerPanel({
                   type="button"
                   disabled={page >= totalPages}
                   onClick={() => setPage(page + 1)}
-                  className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-border px-3 text-xs font-medium text-text disabled:opacity-40"
+                  className="inline-flex min-h-10 items-center gap-1 rounded-lg border border-border px-3 text-xs font-semibold text-text disabled:opacity-40"
                 >
                   {lang === "ar" ? "التالي" : "Next"}
                   <ChevronLeft size={15} />
@@ -501,11 +501,11 @@ function ProfitabilityComparison({
         />
         <div className="relative flex flex-wrap items-start justify-between gap-3">
           <div>
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[12px] font-medium text-[#aee6db]">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[12px] font-semibold text-[#aee6db]">
               <GitCompareArrows size={14} />
               {lang === "ar" ? "مقارنة محاسبية" : "Accounting comparison"}
             </span>
-            <h3 className="mt-2 text-xl font-medium sm:text-2xl">
+            <h3 className="mt-2 text-xl font-bold sm:text-2xl">
               {lang === "ar"
                 ? "شهر أمام شهر، والبنود وراء الفرق"
                 : "Month against month, with the detail behind the change"}
@@ -524,7 +524,7 @@ function ProfitabilityComparison({
 
       <div className="space-y-5 p-4 sm:p-6">
         <div className="flex flex-wrap items-end gap-3">
-          <label className="min-w-[175px] flex-1 text-xs font-medium text-text-muted">
+          <label className="min-w-[175px] flex-1 text-xs font-semibold text-text-muted">
             {lang === "ar" ? "الشهر الأساسي" : "Base month"}
             <input
               type="month"
@@ -552,14 +552,14 @@ function ProfitabilityComparison({
                 type="button"
                 aria-pressed={comparisonMode === mode}
                 onClick={() => setComparisonMode(mode)}
-                className={`min-h-9 rounded-lg px-3 text-xs font-medium transition-colors ${comparisonMode === mode ? "bg-[#0b4a6b] text-white shadow-sm" : "text-text-muted hover:bg-surface"}`}
+                className={`min-h-9 rounded-lg px-3 text-xs font-semibold transition-colors ${comparisonMode === mode ? "bg-[#0b4a6b] text-white shadow-sm" : "text-text-muted hover:bg-surface"}`}
               >
                 {label}
               </button>
             ))}
           </div>
           {comparisonMode === "custom" && (
-            <label className="min-w-[175px] flex-1 text-xs font-medium text-text-muted">
+            <label className="min-w-[175px] flex-1 text-xs font-semibold text-text-muted">
               {lang === "ar" ? "شهر المقارنة" : "Comparison month"}
               <input
                 type="month"
@@ -651,21 +651,21 @@ function ProfitabilityComparison({
                 return (
                   <div
                     key={metric.key}
-                    className="rounded-2xl border border-border bg-surface-2/40 p-4 transition-colors duration-300 motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-md"
+                    className="rounded-2xl border border-border bg-surface-2/40 p-4 transition-all duration-300 motion-safe:hover:-translate-y-0.5 motion-safe:hover:shadow-md"
                     style={{ borderTop: `3px solid ${metric.color}` }}
                   >
-                    <div className="text-xs font-medium text-text-muted">{metric.label}</div>
+                    <div className="text-xs font-semibold text-text-muted">{metric.label}</div>
                     {"help" in metric && (
                       <div className="mt-1 text-[12px] leading-relaxed text-text-muted">
                         {metric.help}
                       </div>
                     )}
-                    <div className="num mt-2 text-xl font-medium text-text">{usd(current)}</div>
+                    <div className="num mt-2 text-xl font-extrabold text-text">{usd(current)}</div>
                     <div className="mt-1 text-[12px] text-text-muted">
                       {lang === "ar" ? "مقابل" : "vs"} <span className="num">{usd(past)}</span>
                     </div>
                     <div
-                      className={`mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border pt-2 text-xs font-medium ${improvement === null ? "text-text-muted" : improvement ? "text-[#087a67]" : "text-[#b64b3d]"}`}
+                      className={`mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border pt-2 text-xs font-bold ${improvement === null ? "text-text-muted" : improvement ? "text-[#087a67]" : "text-[#b64b3d]"}`}
                     >
                       <span className="num" dir="ltr">
                         {delta === null ? "—" : `${delta > 0 ? "+" : ""}${usd(delta)}`}
@@ -685,7 +685,7 @@ function ProfitabilityComparison({
 
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.8fr)]">
               <div className="rounded-2xl border border-border p-4">
-                <h4 className="text-sm font-medium text-text">
+                <h4 className="text-sm font-bold text-text">
                   {lang === "ar" ? "الصورة المالية للشهرين" : "Financial picture of both months"}
                 </h4>
                 <p className="mt-0.5 text-[12px] text-text-muted">
@@ -702,7 +702,9 @@ function ProfitabilityComparison({
                       const max = Math.max(Math.abs(current), Math.abs(past), 1);
                       return (
                         <div key={metric.key}>
-                          <div className="mb-1.5 text-xs font-medium text-text">{metric.label}</div>
+                          <div className="mb-1.5 text-xs font-semibold text-text">
+                            {metric.label}
+                          </div>
                           <div className="space-y-1.5">
                             {(
                               [
@@ -723,7 +725,7 @@ function ProfitabilityComparison({
                                     }}
                                   />
                                 </div>
-                                <span className="num w-24 shrink-0 text-end text-[12px] font-medium text-text">
+                                <span className="num w-24 shrink-0 text-end text-[12px] font-bold text-text">
                                   {usd(value)}
                                 </span>
                               </div>
@@ -735,7 +737,7 @@ function ProfitabilityComparison({
                 </div>
               </div>
               <div className="rounded-2xl border border-border p-4">
-                <h4 className="text-sm font-medium text-text">
+                <h4 className="text-sm font-bold text-text">
                   {lang === "ar" ? "هامش صافي الربح" : "Net profit margin"}
                 </h4>
                 <div className="mt-4 grid grid-cols-2 gap-2">
@@ -754,7 +756,7 @@ function ProfitabilityComparison({
                       >
                         <div className="num text-[12px] text-text-muted">{month as string}</div>
                         <div
-                          className="num mt-2 text-2xl font-medium"
+                          className="num mt-2 text-2xl font-extrabold"
                           style={{ color: color as string }}
                         >
                           {fmtPct(margin, 1)}
@@ -777,7 +779,7 @@ function ProfitabilityComparison({
             <div className="rounded-2xl border border-border p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h4 className="text-sm font-medium text-text">
+                  <h4 className="text-sm font-bold text-text">
                     {lang === "ar" ? "البنود التي صنعت الفرق" : "What drove the difference"}
                   </h4>
                   <p className="mt-0.5 text-[12px] text-text-muted">
@@ -793,7 +795,7 @@ function ProfitabilityComparison({
                       type="button"
                       aria-pressed={section === item}
                       onClick={() => setSection(item)}
-                      className={`rounded-md px-3 py-1.5 text-xs font-medium ${section === item ? "bg-surface text-brand shadow-sm" : "text-text-muted"}`}
+                      className={`rounded-md px-3 py-1.5 text-xs font-semibold ${section === item ? "bg-surface text-brand shadow-sm" : "text-text-muted"}`}
                     >
                       {item === "expenses"
                         ? lang === "ar"
@@ -814,7 +816,7 @@ function ProfitabilityComparison({
                       className="grid gap-2 py-3 sm:grid-cols-[minmax(140px,1fr)_minmax(0,1.5fr)] sm:items-center"
                     >
                       <div className="min-w-0">
-                        <div className="truncate text-xs font-medium text-text" title={row.name}>
+                        <div className="truncate text-xs font-semibold text-text" title={row.name}>
                           {row.name}
                         </div>
                         <div className="num mt-1 text-[12px] text-text-muted" dir="ltr">
@@ -848,7 +850,7 @@ function ProfitabilityComparison({
                                 }}
                               />
                             </div>
-                            <span className="num w-24 shrink-0 text-end text-[12px] font-medium text-text">
+                            <span className="num w-24 shrink-0 text-end text-[12px] font-bold text-text">
                               {usd(value)}
                             </span>
                           </div>
@@ -868,7 +870,7 @@ function ProfitabilityComparison({
                 type="button"
                 onClick={() => setShowAccounts((value) => !value)}
                 aria-expanded={showAccounts}
-                className="mt-4 min-h-10 rounded-xl border border-brand/25 bg-brand/5 px-4 text-xs font-medium text-brand hover:bg-brand/10"
+                className="mt-4 min-h-10 rounded-xl border border-brand/25 bg-brand/5 px-4 text-xs font-bold text-brand hover:bg-brand/10"
               >
                 {showAccounts
                   ? lang === "ar"
@@ -888,7 +890,7 @@ function ProfitabilityComparison({
                       key={`${month}-${section}`}
                       className="min-w-0 rounded-xl bg-surface-2/35 p-3"
                     >
-                      <div className="mb-4 text-sm font-medium text-text">
+                      <div className="mb-4 text-sm font-bold text-text">
                         {monthName(month, lang)}{" "}
                         <span className="num text-xs font-normal text-text-muted">
                           {snapshot.from} → {snapshot.to}
@@ -1067,11 +1069,11 @@ export function ProfitAndLossView() {
         />
         <div className="relative flex flex-wrap items-start justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[12px] font-medium">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[12px] font-semibold">
               <BadgeDollarSign size={14} />
               {lang === "ar" ? "التقرير المحاسبي" : "Accounting report"}
             </div>
-            <h2 className="mt-3 text-2xl font-medium tracking-tight sm:text-3xl">
+            <h2 className="mt-3 text-2xl font-extrabold tracking-tight sm:text-3xl">
               {lang === "ar" ? "من الإيراد إلى صافي الربح" : "From revenue to net profit"}
             </h2>
             <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/75">
@@ -1090,7 +1092,7 @@ export function ProfitAndLossView() {
                 <div className="text-[12px] text-white/70">
                   {lang === "ar" ? "هامش صافي الربح" : "Net margin"}
                 </div>
-                <div className="num mt-1 text-2xl font-medium">{fmtPct(netMargin, 1)}</div>
+                <div className="num mt-1 text-2xl font-bold">{fmtPct(netMargin, 1)}</div>
                 <div className="mt-1 text-[12px] text-white/70">
                   {report.from} → {report.to}
                 </div>
@@ -1100,7 +1102,7 @@ export function ProfitAndLossView() {
                 <div className="text-[12px] text-white/70">
                   {lang === "ar" ? "المقارنة" : "Comparison"}
                 </div>
-                <div className="mt-1 flex items-center gap-2 text-lg font-medium">
+                <div className="mt-1 flex items-center gap-2 text-lg font-bold">
                   <GitCompareArrows size={20} />
                   {lang === "ar" ? "شهران من اختيارك" : "Two chosen months"}
                 </div>
@@ -1120,7 +1122,7 @@ export function ProfitAndLossView() {
           role="tab"
           aria-selected={activeTab === "report"}
           onClick={() => setActiveTab("report")}
-          className={`min-h-10 rounded-xl px-4 text-sm font-medium transition-colors ${activeTab === "report" ? "bg-surface text-brand shadow-sm" : "text-text-muted hover:text-text"}`}
+          className={`min-h-10 rounded-xl px-4 text-sm font-bold transition-colors ${activeTab === "report" ? "bg-surface text-brand shadow-sm" : "text-text-muted hover:text-text"}`}
         >
           {lang === "ar" ? "تحليل الفترة" : "Period analysis"}
         </button>
@@ -1129,7 +1131,7 @@ export function ProfitAndLossView() {
           role="tab"
           aria-selected={activeTab === "comparison"}
           onClick={() => setActiveTab("comparison")}
-          className={`min-h-10 rounded-xl px-4 text-sm font-medium transition-colors ${activeTab === "comparison" ? "bg-surface text-brand shadow-sm" : "text-text-muted hover:text-text"}`}
+          className={`min-h-10 rounded-xl px-4 text-sm font-bold transition-colors ${activeTab === "comparison" ? "bg-surface text-brand shadow-sm" : "text-text-muted hover:text-text"}`}
         >
           <span className="inline-flex items-center gap-2">
             <GitCompareArrows size={16} />
@@ -1149,7 +1151,7 @@ export function ProfitAndLossView() {
                   type="button"
                   aria-pressed={focus === card.key}
                   onClick={() => setFocus(card.key)}
-                  className={`rounded-2xl border bg-surface p-4 text-start shadow-sm transition-colors hover:-translate-y-0.5 hover:shadow-md ${focus === card.key ? "ring-2 ring-brand/40" : "border-border"}`}
+                  className={`rounded-2xl border bg-surface p-4 text-start shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md ${focus === card.key ? "ring-2 ring-brand/40" : "border-border"}`}
                   style={focus === card.key ? { borderColor: card.color } : undefined}
                 >
                   <span
@@ -1158,7 +1160,7 @@ export function ProfitAndLossView() {
                   >
                     <Icon size={19} />
                   </span>
-                  <span className="mt-3 block text-xs font-medium text-text-muted">
+                  <span className="mt-3 block text-xs font-semibold text-text-muted">
                     {card.title}
                   </span>
                   <strong className="num mt-1 block text-xl text-text sm:text-2xl">
@@ -1179,10 +1181,10 @@ export function ProfitAndLossView() {
           <Card className="space-y-5">
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-4">
               <div>
-                <div className="text-xs font-medium text-brand">
+                <div className="text-xs font-semibold text-brand">
                   {lang === "ar" ? "داخل الرقم" : "Inside the figure"}
                 </div>
-                <h3 className="mt-1 text-lg font-medium text-text">
+                <h3 className="mt-1 text-lg font-bold text-text">
                   {chosen.title} · {usd(chosen.value)}
                 </h3>
                 <p className="mt-1 text-xs text-text-muted">{chosen.hint}</p>
@@ -1213,7 +1215,7 @@ export function ProfitAndLossView() {
                   className="rounded-xl border border-border bg-surface-2/50 px-3 py-3"
                 >
                   <div className="text-xs text-text-muted">{item.label}</div>
-                  <div className="num mt-1 text-lg font-medium text-text">{usd(item.value)}</div>
+                  <div className="num mt-1 text-lg font-bold text-text">{usd(item.value)}</div>
                   <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-border">
                     <div
                       className="h-full rounded-full"
@@ -1247,7 +1249,7 @@ export function ProfitAndLossView() {
             <Card>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h3 className="text-base font-medium text-text">
+                  <h3 className="text-base font-bold text-text">
                     {lang === "ar"
                       ? "حركة الإيرادات والمصروفات بالشهور"
                       : "Monthly income and expenses"}
@@ -1295,10 +1297,10 @@ export function ProfitAndLossView() {
                     onClick={() => setSelectedMonth(item.month)}
                     className={`min-w-28 shrink-0 rounded-xl border px-3 py-2 text-start transition-colors ${selectedMonth === item.month ? "border-brand bg-brand/5" : "border-border bg-surface hover:bg-surface-2"}`}
                   >
-                    <span className="block text-xs font-medium text-text">
+                    <span className="block text-xs font-semibold text-text">
                       {monthName(item.month, lang)}
                     </span>
-                    <span className="num mt-1 block text-sm font-medium text-text">
+                    <span className="num mt-1 block text-sm font-bold text-text">
                       {item.snapshot
                         ? usd(item.snapshot.netProfit)
                         : item.status === "error"
@@ -1314,7 +1316,7 @@ export function ProfitAndLossView() {
                 <button
                   type="button"
                   onClick={() => refetch()}
-                  className="mt-3 text-xs font-medium text-brand hover:underline"
+                  className="mt-3 text-xs font-semibold text-brand hover:underline"
                 >
                   {lang === "ar" ? "إعادة تحميل الشهور غير المتاحة" : "Retry unavailable months"}
                 </button>
@@ -1326,33 +1328,33 @@ export function ProfitAndLossView() {
             <Card className="space-y-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="text-xs font-medium text-brand">
+                  <div className="text-xs font-semibold text-brand">
                     {monthName(selectedMonth, lang)}
                   </div>
-                  <h3 className="mt-1 text-lg font-medium text-text">
+                  <h3 className="mt-1 text-lg font-bold text-text">
                     {lang === "ar" ? "تفاصيل الشهر المختار" : "Selected month details"}
                   </h3>
                 </div>
-                <span className="num text-lg font-medium text-text">
+                <span className="num text-lg font-bold text-text">
                   {usd(monthSummary.netProfit)}
                 </span>
               </div>
               <div className="grid gap-2 sm:grid-cols-3">
                 <div className="rounded-xl bg-surface-2 px-3 py-2 text-xs text-text-muted">
                   {lang === "ar" ? "الإيرادات" : "Income"}
-                  <div className="num mt-1 text-base font-medium text-text">
+                  <div className="num mt-1 text-base font-bold text-text">
                     {usd(monthSummary.income)}
                   </div>
                 </div>
                 <div className="rounded-xl bg-surface-2 px-3 py-2 text-xs text-text-muted">
                   {lang === "ar" ? "المصروفات" : "Expenses"}
-                  <div className="num mt-1 text-base font-medium text-text">
+                  <div className="num mt-1 text-base font-bold text-text">
                     {usd(monthSummary.expenses)}
                   </div>
                 </div>
                 <div className="rounded-xl bg-surface-2 px-3 py-2 text-xs text-text-muted">
                   {lang === "ar" ? "هامش الربح" : "Margin"}
-                  <div className="num mt-1 text-base font-medium text-text">
+                  <div className="num mt-1 text-base font-bold text-text">
                     {monthSummary.income
                       ? fmtPct(((monthSummary.netProfit ?? 0) / monthSummary.income) * 100, 1)
                       : "—"}

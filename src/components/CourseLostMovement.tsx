@@ -23,11 +23,11 @@ export function CourseLostMovement({
               <BookOpen size={20} />
             </span>
             <div>
-              <div className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-danger/20 bg-surface/80 px-2.5 py-1 text-[12px] font-medium text-danger">
+              <div className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-danger/20 bg-surface/80 px-2.5 py-1 text-[12px] font-bold text-danger">
                 <CalendarClock size={12} />
                 {A ? "حسب تاريخ الإغلاق" : "By close date"}
               </div>
-              <h2 className="text-lg font-medium text-text sm:text-xl">
+              <h2 className="text-lg font-bold text-text sm:text-xl">
                 {A ? "Lost حسب الكورس" : "Lost by course"}
               </h2>
               <p className="mt-1 text-xs leading-6 text-text-muted">
@@ -51,8 +51,8 @@ export function CourseLostMovement({
                 key={String(label)}
                 className="rounded-2xl border border-border bg-surface/90 p-3"
               >
-                <p className="text-[12px] font-medium leading-4 text-text-muted">{label}</p>
-                <p className={`num mt-1 text-lg font-medium ${tone}`}>{fmtNum(Number(value))}</p>
+                <p className="text-[12px] font-semibold leading-4 text-text-muted">{label}</p>
+                <p className={`num mt-1 text-lg font-bold ${tone}`}>{fmtNum(Number(value))}</p>
               </div>
             ))}
           </div>
@@ -70,8 +70,8 @@ export function CourseLostMovement({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="num text-[12px] font-medium text-text-subtle">#{index + 1}</span>
-                  <h3 className="truncate font-medium text-text" title={row.label}>
+                  <span className="num text-[12px] font-bold text-text-subtle">#{index + 1}</span>
+                  <h3 className="truncate font-bold text-text" title={row.label}>
                     {row.label}
                   </h3>
                 </div>
@@ -80,13 +80,15 @@ export function CourseLostMovement({
                 )}
               </div>
               <div className="text-end">
-                <p className="num text-2xl font-medium text-danger">{fmtNum(row.lost)}</p>
-                <p className="num text-[12px] font-medium text-danger/75">{fmtPct(row.share, 1)}</p>
+                <p className="num text-2xl font-bold text-danger">{fmtNum(row.lost)}</p>
+                <p className="num text-[12px] font-semibold text-danger/75">
+                  {fmtPct(row.share, 1)}
+                </p>
               </div>
             </div>
             <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-danger-soft">
               <span
-                className="block h-full rounded-full bg-danger transition-colors duration-500 group-hover:brightness-95"
+                className="block h-full rounded-full bg-danger transition-all duration-500 group-hover:brightness-95"
                 style={{ width: `${Math.max(2, (row.lost / peak) * 100)}%` }}
               />
             </div>

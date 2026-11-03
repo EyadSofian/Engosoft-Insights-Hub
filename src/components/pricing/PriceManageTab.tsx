@@ -251,7 +251,7 @@ export function PriceManageTab({
               <BadgeDollarSign size={21} aria-hidden="true" />
             </span>
             <div>
-              <h2 className="text-[16px] font-medium text-text">
+              <h2 className="text-[16px] font-bold text-text">
                 {lang === "ar" ? "عدّل سعر دورة بالكود" : "Edit a course by code"}
               </h2>
               <p className="mt-1 max-w-xl text-[12px] leading-relaxed text-text-muted">
@@ -287,7 +287,7 @@ export function PriceManageTab({
             </div>
             <button
               type="submit"
-              className="min-h-12 rounded-xl bg-brand px-4 text-[13px] font-medium text-white"
+              className="min-h-12 rounded-xl bg-brand px-4 text-[13px] font-bold text-white"
             >
               {lang === "ar" ? "فتح السعر" : "Open price"}
             </button>
@@ -356,14 +356,14 @@ export function PriceManageTab({
                   <button
                     type="button"
                     onClick={() => onSelectBook(row.id)}
-                    className="cursor-pointer text-start text-[14px] font-medium text-text hover:text-brand"
+                    className="cursor-pointer text-start text-[14px] font-bold text-text hover:text-brand"
                   >
                     {row.name}
                   </button>
                   <p className="mt-1 text-[12px] text-text-subtle">{row.sourceName}</p>
                 </div>
                 <div className="text-end">
-                  <div className="text-[20px] font-medium tabular-nums text-brand">
+                  <div className="text-[20px] font-black tabular-nums text-brand">
                     {row.itemCount}
                   </div>
                   <div className="text-[12px] text-text-subtle">
@@ -392,7 +392,7 @@ export function PriceManageTab({
                           : "Published. Re-run the audit so the reports use the new prices.";
                       })
                     }
-                    className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-brand px-2.5 text-[12px] font-medium text-white disabled:opacity-50"
+                    className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-brand px-2.5 text-[12px] font-semibold text-white disabled:opacity-50"
                   >
                     <Rocket size={13} aria-hidden="true" /> {t("pb_publish")}
                   </button>
@@ -550,7 +550,7 @@ export function PriceManageTab({
         {!loading && !itemQuery && (
           <div className="mt-3 rounded-2xl border border-dashed border-brand/30 bg-brand-soft/25 px-4 py-10 text-center">
             <Search size={24} className="mx-auto text-brand" aria-hidden="true" />
-            <p className="mt-2 text-[13px] font-medium text-text">
+            <p className="mt-2 text-[13px] font-bold text-text">
               {lang === "ar"
                 ? "اكتب كود الدورة بالأعلى لفتح أسعارها"
                 : "Enter a course code above to open its prices"}
@@ -595,7 +595,7 @@ export function PriceManageTab({
                             <Pill tone="brand">#{first.rawProductCode || "—"}</Pill>
                             <Pill tone="neutral">{deliveryLabel(first.deliveryType, lang)}</Pill>
                           </div>
-                          <h3 className="text-[14px] font-medium text-text">{first.courseName}</h3>
+                          <h3 className="text-[14px] font-bold text-text">{first.courseName}</h3>
                           <p className="mt-1 text-[12px] text-text-muted">
                             {rows.length}{" "}
                             {lang === "ar" ? "قاعدة سعر داخل الكرت" : "pricing rules in this card"}
@@ -627,7 +627,7 @@ export function PriceManageTab({
                                   </Pill>
                                 )}
                               </div>
-                              <div className="mt-2 text-[16px] font-medium tabular-nums text-text">
+                              <div className="mt-2 text-[16px] font-black tabular-nums text-text">
                                 {bandText(
                                   {
                                     exact: item.exactPrice,
@@ -654,7 +654,7 @@ export function PriceManageTab({
                                     ? "اعمل نسخة قابلة للتعديل أولًا"
                                     : "Create an editable copy first"
                               }
-                              className="inline-flex min-h-10 items-center gap-1 rounded-xl border border-brand/25 px-3 text-[12px] font-medium text-brand disabled:cursor-not-allowed disabled:opacity-40"
+                              className="inline-flex min-h-10 items-center gap-1 rounded-xl border border-brand/25 px-3 text-[12px] font-bold text-brand disabled:cursor-not-allowed disabled:opacity-40"
                             >
                               <Pencil size={13} aria-hidden="true" />
                               {lang === "ar" ? "تعديل هذا السعر" : "Edit this price"}
@@ -918,7 +918,7 @@ function ImportPanel({
           type="button"
           disabled={disabled || busy || !preview?.ok}
           onClick={() => void send(true)}
-          className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-[13px] font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
           style={{ background: "var(--brand)" }}
         >
           {lang === "ar" ? "إنشاء مسودة" : "Create draft"}
@@ -987,7 +987,7 @@ function ImportPanel({
 
           {!!preview.duplicateCodes.length && (
             <div>
-              <p className="mb-1 text-[12px] font-medium text-text">
+              <p className="mb-1 text-[12px] font-semibold text-text">
                 {lang === "ar"
                   ? "أكواد متكررة (كل الصفوف محفوظة، ولا يُحذف أي صف)"
                   : "Duplicate codes (every row is kept; none is dropped)"}
@@ -1010,7 +1010,7 @@ function ImportPanel({
 
           {!!preview.issues.length && (
             <details>
-              <summary className="cursor-pointer text-[12px] font-medium text-text">
+              <summary className="cursor-pointer text-[12px] font-semibold text-text">
                 {lang === "ar"
                   ? `ملاحظات الاستيراد (${preview.issues.length})`
                   : `Import notes (${preview.issues.length})`}
@@ -1229,7 +1229,7 @@ function EditDialog({
             type="button"
             onClick={() => void save()}
             disabled={busy}
-            className="min-h-11 cursor-pointer rounded-lg px-4 text-[13px] font-medium text-white disabled:opacity-50"
+            className="min-h-11 cursor-pointer rounded-lg px-4 text-[13px] font-semibold text-white disabled:opacity-50"
             style={{ background: "var(--brand)" }}
           >
             {busy ? (lang === "ar" ? "جارٍ الحفظ…" : "Saving…") : lang === "ar" ? "حفظ" : "Save"}

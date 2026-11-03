@@ -116,25 +116,21 @@ export const Route = createFileRoute("/api/management-review")({
             ? plan.overallMarketingBudgetUsd !== undefined
               ? plan.overallMarketingBudgetUsd
               : plan.leadGenerationBudgetUsd > 0
-                ? plan.leadGenerationBudgetUsd +
-                  plan.additionalActivities.reduce((sum, activity) => sum + activity.budgetUsd, 0)
-                : month === "2026-10" && !source.editedMonths.includes(month)
-                  ? OCTOBER_2026_SOURCE.marketingBudgetUsd
-                  : null
+                ? plan.leadGenerationBudgetUsd + plan.additionalActivities.reduce((sum, activity) => sum + activity.budgetUsd, 0)
+              : month === "2026-10" && !source.editedMonths.includes(month)
+                ? OCTOBER_2026_SOURCE.marketingBudgetUsd
+                : null
             : null;
-          const lostCounts =
-            historicalMonth || !crmCovered
-              ? null
-              : lostPopulationCounts(
-                  lostPopulations({
-                    cohortRows: data.lost,
-                    closedRows: closedData.lost,
-                    window: {
-                      from: `${month}-01`,
-                      to: `${month}-${String(new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate()).padStart(2, "0")}`,
-                    },
-                  }),
-                );
+          const lostCounts = historicalMonth || !crmCovered ? null : lostPopulationCounts(
+            lostPopulations({
+              cohortRows: data.lost,
+              closedRows: closedData.lost,
+              window: {
+                from: `${month}-01`,
+                to: `${month}-${String(new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate()).padStart(2, "0")}`,
+              },
+            }),
+          );
           return {
             month,
             historicalStatus: historicalMonth ? historical.status : "ready",
@@ -155,8 +151,7 @@ export const Route = createFileRoute("/api/management-review")({
             actual: {
               revenue,
               certificateRevenue: revenueCovered ? certificateRevenue : null,
-              revenueIncludingCertificates:
-                revenueCovered && revenue !== null ? revenue + certificateRevenue : null,
+              revenueIncludingCertificates: revenueCovered && revenue !== null ? revenue + certificateRevenue : null,
               spend,
               leads: planLeadsActual,
               crmLeads: crmCovered ? funnel.leads : null,
@@ -173,16 +168,9 @@ export const Route = createFileRoute("/api/management-review")({
                   : rate(planLeadsActual, leadTarget),
             },
             budget: {
-              actualRevenueAllowance:
-                revenue === null || month !== "2026-09" ? null : revenue * 0.17,
-              actualRevenueUtilization:
-                revenue === null || spend === null || month !== "2026-09"
-                  ? null
-                  : rate(spend, revenue * 0.17),
-              actualGrossAllowance:
-                revenue === null || month !== "2026-09"
-                  ? null
-                  : (revenue + certificateRevenue) * 0.17,
+              actualRevenueAllowance: revenue === null || month !== "2026-09" ? null : revenue * 0.17,
+              actualRevenueUtilization: revenue === null || spend === null || month !== "2026-09" ? null : rate(spend, revenue * 0.17),
+              actualGrossAllowance: revenue === null || month !== "2026-09" ? null : (revenue + certificateRevenue) * 0.17,
               targetRate: month === "2026-09" ? 0.17 : null,
             },
             lostMovement: {

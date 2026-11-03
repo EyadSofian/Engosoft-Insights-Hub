@@ -11,18 +11,10 @@ export const Route = createFileRoute("/api/employee-calls")({
         const url = new URL(request.url);
         const extension = (url.searchParams.get("extension") || "").trim();
         if (!/^\d{1,16}$/.test(extension)) {
-          return Response.json(
-            { error: "A valid employee extension is required" },
-            { status: 400 },
-          );
+          return Response.json({ error: "A valid employee extension is required" }, { status: 400 });
         }
         const filters = await parseFilters(request);
-        if (
-          !filters.from ||
-          !filters.to ||
-          !datePattern.test(filters.from) ||
-          !datePattern.test(filters.to)
-        ) {
+        if (!filters.from || !filters.to || !datePattern.test(filters.from) || !datePattern.test(filters.to)) {
           return Response.json({ error: "A valid date range is required" }, { status: 400 });
         }
         const page = Math.max(1, Number(url.searchParams.get("page") || 1));

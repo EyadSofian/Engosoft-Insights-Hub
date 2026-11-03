@@ -55,10 +55,10 @@ export function CourseLeadLossComparison({
                 <BookOpenCheck size={20} />
               </span>
               <div>
-                <p className="text-[12px] font-medium text-brand">
+                <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-brand">
                   {A ? "تحليل الكوهورت" : "Course cohort"}
                 </p>
-                <h2 className="text-lg font-medium text-text sm:text-xl">
+                <h2 className="text-lg font-bold text-text sm:text-xl">
                   {A ? "جودة ليدز الفترة حسب الكورس" : "Period lead quality by course"}
                 </h2>
               </div>
@@ -72,35 +72,35 @@ export function CourseLeadLossComparison({
 
           <div className="grid grid-cols-2 gap-2 xl:min-w-[560px] xl:grid-cols-4">
             <div className="rounded-2xl border border-brand/15 bg-surface/90 px-4 py-3">
-              <div className="flex items-center gap-1.5 text-[12px] font-medium text-text-muted">
+              <div className="flex items-center gap-1.5 text-[12px] font-semibold text-text-muted">
                 <Users size={12} />
                 {A ? "ليدز الفترة" : "Period leads"}
               </div>
-              <div className="num mt-1 text-xl font-medium text-brand">
+              <div className="num mt-1 text-xl font-bold text-brand">
                 {fmtNum(report.totals.leads)}
               </div>
             </div>
             <div className="rounded-2xl border border-danger/15 bg-surface/90 px-4 py-3">
-              <div className="text-[12px] font-medium text-text-muted">
+              <div className="text-[12px] font-semibold text-text-muted">
                 {A ? "إجمالي Lost" : "Total Lost"}
               </div>
-              <div className="num mt-1 text-xl font-medium text-danger">
+              <div className="num mt-1 text-xl font-bold text-danger">
                 {fmtNum(report.totals.lost)}
               </div>
             </div>
             <div className="rounded-2xl border border-danger/15 bg-surface/90 px-4 py-3">
-              <div className="text-[12px] font-medium text-text-muted">
+              <div className="text-[12px] font-semibold text-text-muted">
                 {A ? "Lost Leads" : "Lost Leads"}
               </div>
-              <div className="num mt-1 text-xl font-medium text-danger">
+              <div className="num mt-1 text-xl font-bold text-danger">
                 {fmtNum(report.totals.lostLeads)}
               </div>
             </div>
             <div className="rounded-2xl border border-danger/15 bg-surface/90 px-4 py-3">
-              <div className="text-[12px] font-medium text-text-muted">
+              <div className="text-[12px] font-semibold text-text-muted">
                 {A ? "Lost Opportunities" : "Lost Opportunities"}
               </div>
-              <div className="num mt-1 text-xl font-medium text-danger">
+              <div className="num mt-1 text-xl font-bold text-danger">
                 {fmtNum(report.totals.lostOpportunities)}
               </div>
             </div>
@@ -117,7 +117,7 @@ export function CourseLeadLossComparison({
             <col className="w-[24%]" />
           </colgroup>
           <thead>
-            <tr className="border-b border-border bg-surface-2/55 text-[12px] text-text-muted">
+            <tr className="border-b border-border bg-surface-2/55 text-[12px] uppercase tracking-wide text-text-muted">
               <th className="px-5 py-3.5 text-start lg:px-7">{A ? "الكورس" : "Course"}</th>
               <th className="px-4 py-3.5 text-start">
                 <span className="block">{A ? "ليدز الفترة" : "Period leads"}</span>
@@ -161,18 +161,18 @@ export function CourseLeadLossComparison({
                     <div className="mt-0.5 text-[12px] text-text-subtle">Odoo: {row.course}</div>
                   )}
                   {onSelect && (
-                    <div className="mt-1 inline-flex items-center gap-1 text-[12px] font-medium text-brand">
+                    <div className="mt-1 inline-flex items-center gap-1 text-[12px] font-semibold text-brand">
                       {A ? "عرض الليدز" : "View leads"} <ExternalLink size={10} />
                     </div>
                   )}
                 </td>
-                <td className="num px-4 py-4 text-start text-lg font-medium text-text">
+                <td className="num px-4 py-4 text-start text-lg font-bold text-text">
                   {fmtNum(row.leads)}
                 </td>
                 <td className="px-4 py-4 text-start">
                   <div className="flex items-baseline gap-2">
-                    <span className="num text-lg font-medium text-danger">{fmtNum(row.lost)}</span>
-                    <span className="num text-xs font-medium text-danger/80">
+                    <span className="num text-lg font-bold text-danger">{fmtNum(row.lost)}</span>
+                    <span className="num text-xs font-semibold text-danger/80">
                       {fmtPct(row.lostRate, 1)}
                     </span>
                   </div>
@@ -201,7 +201,7 @@ export function CourseLeadLossComparison({
             ))}
           </tbody>
           <tfoot>
-            <tr className="bg-surface-2/65 font-medium text-text">
+            <tr className="bg-surface-2/65 font-bold text-text">
               <td className="px-5 py-4 lg:px-7">{A ? "الإجمالي" : "Total"}</td>
               <td className="num px-4 py-4 text-start text-lg">{fmtNum(report.totals.leads)}</td>
               <td className="px-4 py-4 text-start">
@@ -236,7 +236,7 @@ export function CourseLeadLossComparison({
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="font-medium text-text">{row.label}</h3>
+                <h3 className="font-bold text-text">{row.label}</h3>
                 {row.course !== row.label && (
                   <p className="mt-0.5 text-[12px] text-text-subtle">Odoo: {row.course}</p>
                 )}
@@ -245,20 +245,20 @@ export function CourseLeadLossComparison({
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2">
               <div className="rounded-xl bg-brand-soft/55 p-2.5">
-                <p className="text-[12px] font-medium text-text-muted">
+                <p className="text-[12px] font-semibold text-text-muted">
                   {A ? "ليدز الفترة" : "Leads"}
                 </p>
-                <p className="num mt-1 text-base font-medium text-brand">{fmtNum(row.leads)}</p>
+                <p className="num mt-1 text-base font-bold text-brand">{fmtNum(row.leads)}</p>
               </div>
               <div className="rounded-xl bg-danger-soft/60 p-2.5">
-                <p className="text-[12px] font-medium text-text-muted">{A ? "الخسائر" : "Lost"}</p>
-                <p className="num mt-1 text-base font-medium text-danger">{fmtNum(row.lost)}</p>
+                <p className="text-[12px] font-semibold text-text-muted">
+                  {A ? "الخسائر" : "Lost"}
+                </p>
+                <p className="num mt-1 text-base font-bold text-danger">{fmtNum(row.lost)}</p>
               </div>
               <div className="rounded-xl bg-surface-2 p-2.5">
-                <p className="text-[12px] font-medium text-text-muted">{A ? "النسبة" : "Rate"}</p>
-                <p className="num mt-1 text-base font-medium text-text">
-                  {fmtPct(row.lostRate, 1)}
-                </p>
+                <p className="text-[12px] font-semibold text-text-muted">{A ? "النسبة" : "Rate"}</p>
+                <p className="num mt-1 text-base font-bold text-text">{fmtPct(row.lostRate, 1)}</p>
               </div>
             </div>
             <p className="mt-2 text-[12px] text-text-subtle">

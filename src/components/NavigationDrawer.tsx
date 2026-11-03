@@ -123,7 +123,7 @@ export function NavigationDrawer() {
                 setOpen(false);
                 window.dispatchEvent(new Event("engosoft:open-chat"));
               }}
-              className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-4 text-[13px] font-medium text-white"
+              className="flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-xl px-4 text-[13px] font-semibold text-white"
               style={{ background: "var(--ink)" }}
             >
               <Sparkles size={17} aria-hidden="true" />
@@ -132,7 +132,7 @@ export function NavigationDrawer() {
             <Dialog.Close asChild>
               <Link
                 to="/guide"
-                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border text-[13px] font-medium text-text-muted transition-colors hover:bg-surface-2 hover:text-text"
+                className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-border text-[13px] font-semibold text-text-muted transition-colors hover:bg-surface-2 hover:text-text"
               >
                 <BookOpen size={16} aria-hidden="true" />
                 {A ? "دليل استخدام الداشبورد" : "Dashboard user guide"}

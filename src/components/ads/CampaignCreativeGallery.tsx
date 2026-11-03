@@ -106,8 +106,8 @@ function CreativeMedia({ row }: { row: CreativeAnalyticsRow }) {
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-lg border border-border/70 bg-surface-2/70 px-2 py-1.5">
-      <div className="text-[12px] text-text-subtle">{label}</div>
-      <div className="num mt-0.5 truncate text-[12px] font-medium text-text">{value}</div>
+      <div className="text-[12px] uppercase tracking-wide text-text-subtle">{label}</div>
+      <div className="num mt-0.5 truncate text-[12px] font-semibold text-text">{value}</div>
     </div>
   );
 }
@@ -132,11 +132,11 @@ function CreativeCard({
     row.ad || row.adset || row.creativeName || (lang === "ar" ? "إعلان بدون اسم" : "Unnamed ad");
 
   return (
-    <article className="group overflow-hidden rounded-2xl border border-border bg-surface shadow-sm transition-colors duration-200 hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-md">
+    <article className="group overflow-hidden rounded-2xl border border-border bg-surface shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-brand/30 hover:shadow-md">
       <div className="relative aspect-[16/10] overflow-hidden border-b border-border bg-surface-2">
         <CreativeMedia row={row} />
         <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-2.5 pointer-events-none">
-          <span className="inline-flex items-center gap-1 rounded-full border border-white/40 bg-slate-950/70 px-2 py-1 text-[12px] font-medium text-white shadow-sm backdrop-blur">
+          <span className="inline-flex items-center gap-1 rounded-full border border-white/40 bg-slate-950/70 px-2 py-1 text-[12px] font-semibold text-white shadow-sm backdrop-blur">
             {row.mediaType.includes("video") ? (
               <Film size={10} />
             ) : row.mediaType.includes("carousel") ? (
@@ -147,7 +147,7 @@ function CreativeCard({
             {mediaLabel(row, lang)}
           </span>
           {showWinner && rank === 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-1 text-[12px] font-medium text-amber-950 shadow-sm">
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-2 py-1 text-[12px] font-bold text-amber-950 shadow-sm">
               <Trophy size={10} />
               {lang === "ar" ? "الأفضل" : "Top"}
             </span>
@@ -160,7 +160,7 @@ function CreativeCard({
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
               <h5
-                className="line-clamp-2 text-[12.5px] font-medium leading-5 text-text"
+                className="line-clamp-2 text-[12.5px] font-semibold leading-5 text-text"
                 dir="auto"
                 title={title}
               >
@@ -176,7 +176,7 @@ function CreativeCard({
             <div className="flex shrink-0 flex-col items-end gap-1">
               <PlatformBadges platforms={[row.platform]} />
               {showCampaign && row.status.toUpperCase() === "ACTIVE" && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[8.5px] font-medium text-emerald-700">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[8.5px] font-bold text-emerald-700">
                   <Radio size={8} />
                   {lang === "ar" ? "شغّال" : "Live"}
                 </span>
@@ -224,7 +224,7 @@ function CreativeCard({
             <button
               type="button"
               onClick={() => onOpenDetail(row.creativeId)}
-              className="inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-md text-[12px] font-medium text-brand hover:underline"
+              className="inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-md text-[12px] font-semibold text-brand hover:underline"
               title={`ID ${row.creativeId}`}
             >
               {lang === "ar" ? "العملاء والمبيعات" : "Leads & sales"}
@@ -237,7 +237,7 @@ function CreativeCard({
               href={previewUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 text-[12px] font-medium text-brand hover:underline"
+              className="inline-flex items-center gap-1 text-[12px] font-semibold text-brand hover:underline"
             >
               {lang === "ar" ? "فتح الأصل" : "Open source"}
               <ExternalLink size={10} />
@@ -292,7 +292,7 @@ export function CampaignCreativeGallery({
               <LayoutGrid size={16} />
             </span>
             <div>
-              <h4 className="text-[13px] font-medium text-text">
+              <h4 className="text-[13px] font-semibold text-text">
                 {lang === "ar" ? "مكتبة محتوى الحملة" : "Campaign creative library"}
               </h4>
               <p className="text-[12px] text-text-subtle">
@@ -366,7 +366,7 @@ export function CampaignCreativeGallery({
           <span className="mx-auto grid h-11 w-11 place-items-center rounded-2xl bg-brand-soft text-brand">
             <MousePointerClick size={20} />
           </span>
-          <h5 className="mt-3 text-[12px] font-medium text-text">
+          <h5 className="mt-3 text-[12px] font-semibold text-text">
             {lang === "ar"
               ? "مفيش Creative metadata للحملة دي لسه"
               : "No creative metadata for this campaign yet"}
@@ -467,10 +467,10 @@ export function CourseCreativeGallery({ courseName }: { courseName: string }) {
                 <Sparkles size={18} />
               </span>
               <div>
-                <p className="text-[12px] font-medium text-brand">
+                <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-brand">
                   {lang === "ar" ? "Creative intelligence" : "Creative intelligence"}
                 </p>
-                <h3 className="text-lg font-medium text-text sm:text-xl">
+                <h3 className="text-lg font-bold text-text sm:text-xl">
                   {lang === "ar" ? `أفضل كرياتيفات ${courseName}` : `Best ${courseName} creatives`}
                 </h3>
               </div>
@@ -488,7 +488,7 @@ export function CourseCreativeGallery({ courseName }: { courseName: string }) {
                 type="button"
                 onClick={() => setScope("live")}
                 disabled={liveRows.length === 0}
-                className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg px-3 text-[12px] font-medium transition-colors ${
+                className={`inline-flex min-h-8 items-center gap-1.5 rounded-lg px-3 text-[12px] font-bold transition-colors ${
                   effectiveScope === "live"
                     ? "bg-brand text-white"
                     : "text-text-muted hover:text-text disabled:opacity-40"
@@ -501,7 +501,7 @@ export function CourseCreativeGallery({ courseName }: { courseName: string }) {
               <button
                 type="button"
                 onClick={() => setScope("all")}
-                className={`min-h-8 rounded-lg px-3 text-[12px] font-medium transition-colors ${
+                className={`min-h-8 rounded-lg px-3 text-[12px] font-bold transition-colors ${
                   effectiveScope === "all"
                     ? "bg-brand text-white"
                     : "text-text-muted hover:text-text"
@@ -516,7 +516,7 @@ export function CourseCreativeGallery({ courseName }: { courseName: string }) {
               <select
                 value={sort}
                 onChange={(event) => setSort(event.target.value as CreativeSort)}
-                className="bg-transparent text-[12px] font-medium text-text outline-none"
+                className="bg-transparent text-[12px] font-bold text-text outline-none"
               >
                 {(Object.keys(SORTS) as CreativeSort[]).map((key) => (
                   <option key={key} value={key}>
@@ -532,7 +532,7 @@ export function CourseCreativeGallery({ courseName }: { courseName: string }) {
       {isLoading ? (
         <div className="grid gap-3 p-4 md:grid-cols-2 2xl:grid-cols-3 sm:p-5">
           {Array.from({ length: 3 }).map((_, index) => (
-            <Skeleton key={index} className="h-[392px] rounded-2xl" />
+            <Skeleton key={index} className="h-[390px] rounded-2xl" />
           ))}
         </div>
       ) : isError ? (
@@ -545,7 +545,7 @@ export function CourseCreativeGallery({ courseName }: { courseName: string }) {
         <div className="p-5">
           <div className="rounded-2xl border border-dashed border-border bg-surface-2/40 px-5 py-9 text-center">
             <Megaphone className="mx-auto text-brand" size={25} />
-            <h4 className="mt-3 text-sm font-medium text-text">
+            <h4 className="mt-3 text-sm font-bold text-text">
               {lang === "ar" ? "مفيش كرياتيفات مرتبطة بالكورس" : "No course creatives found"}
             </h4>
             <p className="mt-1 text-xs text-text-muted">
@@ -589,7 +589,7 @@ export function CourseCreativeGallery({ courseName }: { courseName: string }) {
                   <span dir="auto">{top.creativeName || top.ad}</span>
                 </p>
               </div>
-              <span className="shrink-0 text-[12px] font-medium text-amber-700">
+              <span className="shrink-0 text-[12px] font-bold text-amber-700">
                 {SORTS[sort][lang]}: {formatCreativeSortValue(top, sort)}
               </span>
             </div>
@@ -632,7 +632,7 @@ function CourseCreativeStat({
     <div className="flex items-center justify-between rounded-xl border border-border/70 bg-surface px-3 py-2.5">
       <div>
         <p className="text-[12px] text-text-muted">{label}</p>
-        <p className="num mt-0.5 text-base font-medium text-text">{value}</p>
+        <p className="num mt-0.5 text-base font-bold text-text">{value}</p>
       </div>
       <span className="grid h-8 w-8 place-items-center rounded-xl bg-brand-soft text-brand">
         {icon}

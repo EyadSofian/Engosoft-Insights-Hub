@@ -183,7 +183,7 @@ export function LeadClassificationAudit({
           <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border pb-4">
             <div>
               <div className="text-xs text-text-muted">{t.total}</div>
-              <div className="num mt-1 text-3xl font-medium text-text">
+              <div className="num mt-1 text-3xl font-bold text-text">
                 {records.length.toLocaleString()}
               </div>
             </div>
@@ -195,8 +195,8 @@ export function LeadClassificationAudit({
                 key={row.key}
                 className={`rounded-xl border-t-[3px] bg-surface-2/65 px-3 py-3 ${row.color}`}
               >
-                <div className="num text-2xl font-medium">{row.count.toLocaleString()}</div>
-                <div className="mt-1 text-[12px] font-medium text-text">{row.label}</div>
+                <div className="num text-2xl font-bold">{row.count.toLocaleString()}</div>
+                <div className="mt-1 text-[12px] font-semibold text-text">{row.label}</div>
               </div>
             ))}
           </div>
@@ -216,8 +216,8 @@ export function LeadClassificationAudit({
             </div>
           </Card>
           <Card className="border-sky-strong/25 bg-sky-surface/40">
-            <div className="text-xs font-medium text-sky-strong">Lead Segment = Fresh</div>
-            <div className="num mt-1 text-3xl font-medium text-text">
+            <div className="text-xs font-semibold text-sky-strong">Lead Segment = Fresh</div>
+            <div className="num mt-1 text-3xl font-bold text-text">
               {summary.freshCount.toLocaleString()}
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
@@ -293,8 +293,8 @@ export function LeadClassificationAudit({
             <Database className="mt-1 shrink-0 text-amber-strong" size={24} />
             <div>
               <div className="text-sm font-semibold text-text">{t.outsideTitle}</div>
-              <div className="mt-1 text-2xl font-medium text-text">—</div>
-              <p className="mt-1 text-xs font-medium text-amber-strong">{t.unavailable}</p>
+              <div className="mt-1 text-2xl font-bold text-text">—</div>
+              <p className="mt-1 text-xs font-semibold text-amber-strong">{t.unavailable}</p>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-text-muted">{t.outsideHint}</p>
               <div className="mt-4 inline-flex items-center gap-2 rounded-xl bg-surface px-3 py-2 text-xs text-text">
                 <ArrowRight size={14} />

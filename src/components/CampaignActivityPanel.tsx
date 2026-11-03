@@ -169,7 +169,7 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                 <button
                   type="button"
                   onClick={() => riskAlertPrefs.restore()}
-                  className="mt-2 inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-current/25 px-2.5 text-[12px] font-medium transition-colors hover:bg-current/10"
+                  className="mt-2 inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-current/25 px-2.5 text-[12px] font-semibold transition-colors hover:bg-current/10"
                 >
                   <BellRing size={13} aria-hidden="true" />
                   {lang === "ar"
@@ -226,7 +226,7 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
             <div className="hscroll scroll-hint-x">
               <div className="min-w-[860px]">
                 <div
-                  className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_repeat(5,104px)_28px] items-center gap-3 border-b border-border bg-surface-2 px-3 py-2 text-[12px] font-medium text-text-subtle"
+                  className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_repeat(5,104px)_28px] items-center gap-3 border-b border-border bg-surface-2 px-3 py-2 text-[12px] font-bold uppercase tracking-wide text-text-subtle"
                   role="row"
                 >
                   <span>{lang === "ar" ? "الحملة" : "Campaign"}</span>
@@ -251,7 +251,7 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                       <summary className="grid min-h-14 cursor-pointer list-none grid-cols-[minmax(0,1fr)_repeat(5,104px)_28px] items-center gap-3 px-3 py-2.5 transition-colors marker:content-none hover:bg-surface-2/70">
                         <div className="min-w-0">
                           <div
-                            className="truncate text-[13px] font-medium text-text"
+                            className="truncate text-[13px] font-semibold text-text"
                             title={row.name}
                           >
                             {row.name || "—"}
@@ -292,7 +292,7 @@ export function CampaignActivityPanel({ activity }: { activity: CampaignActivity
                           once, above the list, where a definition belongs. */}
                       <div className="border-t border-border bg-surface px-3 py-3">
                         <div className="mb-2.5 flex flex-wrap items-center gap-2">
-                          <span className="text-[12px] font-medium text-text-subtle">
+                          <span className="text-[12px] font-bold uppercase tracking-wide text-text-subtle">
                             {lang === "ar" ? "إجمالي تاريخ الحملة" : "Lifetime"}
                           </span>
                           {sold ? (
@@ -419,7 +419,7 @@ function ActivitySpotlight({
       style={{ background: t.surface, borderColor: t.border }}
     >
       <div
-        className="inline-flex items-center gap-1.5 text-[12px] font-medium"
+        className="inline-flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wide"
         style={{ color: t.strong }}
       >
         <span
@@ -431,7 +431,7 @@ function ActivitySpotlight({
         {title}
       </div>
       <div
-        className="mt-2 truncate text-[15px] font-medium"
+        className="mt-2 truncate text-[15px] font-bold"
         style={{ color: t.ink }}
         title={row.name}
       >
@@ -443,15 +443,12 @@ function ActivitySpotlight({
           return (
             <div key={stat.label} className="min-w-0">
               <div
-                className="truncate text-[12px] font-medium"
+                className="truncate text-[12px] font-semibold"
                 style={{ color: t.ink, opacity: 0.6 }}
               >
                 {stat.label}
               </div>
-              <div
-                className="num mt-0.5 truncate text-[13px] font-medium"
-                style={{ color: st.ink }}
-              >
+              <div className="num mt-0.5 truncate text-[13px] font-bold" style={{ color: st.ink }}>
                 {stat.value}
               </div>
             </div>
@@ -476,7 +473,7 @@ function Figure({ value, tone, muted = false }: { value: string; tone: AnyTone; 
   const zero = value === "0" || value === "$0" || value === "—";
   return (
     <span
-      className="num truncate text-end text-[13.5px] font-medium"
+      className="num truncate text-end text-[13.5px] font-bold"
       style={{
         color: zero ? "var(--text-subtle)" : t.ink,
         opacity: zero ? 1 : muted ? 0.72 : 1,
@@ -496,11 +493,11 @@ function LifetimeStat({ label, value, tone }: { label: string; value: string; to
       className="min-w-0 rounded-xl px-2.5 py-2"
       style={{ background: t.surface, border: `1px solid ${t.border}` }}
     >
-      <div className="truncate text-[12px] font-medium" style={{ color: t.ink, opacity: 0.72 }}>
+      <div className="truncate text-[12px] font-semibold" style={{ color: t.ink, opacity: 0.72 }}>
         {label}
       </div>
       <div
-        className="num mt-0.5 truncate text-[13px] font-medium"
+        className="num mt-0.5 truncate text-[13px] font-bold"
         style={{ color: t.ink }}
         title={value}
       >
@@ -584,7 +581,7 @@ function PlatformHealthCard({
       style={{ background: t.surface, borderColor: t.border }}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="truncate text-[12px] font-medium" style={{ color: t.ink }}>
+        <span className="truncate text-[12px] font-bold" style={{ color: t.ink }}>
           {PLATFORM_LABEL[platform][lang]}
         </span>
         <span
@@ -595,7 +592,7 @@ function PlatformHealthCard({
           {ok ? <CircleCheck size={13} /> : <CircleX size={13} />}
         </span>
       </div>
-      <div className="num mt-1.5 text-[22px] font-medium leading-none" style={{ color: t.ink }}>
+      <div className="num mt-1.5 text-[22px] font-bold leading-none" style={{ color: t.ink }}>
         {ok ? fmtNum(health.active) : "—"}
       </div>
       <div className="mt-1 text-[12px] leading-snug" style={{ color: t.ink, opacity: 0.68 }}>
@@ -641,7 +638,7 @@ function StatusCount({
         {icon}
       </span>
       <div className="min-w-0">
-        <div className="num text-[17px] font-medium leading-none text-text">{fmtNum(value)}</div>
+        <div className="num text-[17px] font-bold leading-none text-text">{fmtNum(value)}</div>
         <div className="mt-0.5 truncate text-[12px] text-text-muted" title={label}>
           {label}
         </div>

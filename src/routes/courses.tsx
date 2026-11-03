@@ -27,7 +27,7 @@ import { CourseCreativeGallery } from "@/components/ads/CampaignCreativeGallery"
 import { CourseLeadLossComparison } from "@/components/CourseLeadLossComparison";
 import { DeltaBadge, EmptyState, ErrorState, Notice, Pill, Skeleton } from "@/components/ui-bits";
 import { OverviewCourseContribution } from "@/components/overview-records";
-import { DashboardPageHeader, DataHealthSummary, KpiRow } from "@/components/dashboard-bits";
+import { DashboardPageHeader, DataHealthSummary } from "@/components/dashboard-bits";
 import { MetricDetailTrigger } from "@/components/metric-detail";
 import { topRows, type MetricDetail } from "@/lib/metric-detail";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
@@ -435,14 +435,14 @@ function Courses() {
         <>
           <div className="card-grid grid-cols-2 lg:grid-cols-5">
             {Array.from({ length: 5 }).map((_, index) => (
-              <Skeleton key={index} className="h-[120px]" />
+              <Skeleton key={index} className="h-[118px]" />
             ))}
           </div>
           <Skeleton className="h-[520px]" />
         </>
       ) : (
         <>
-          <KpiRow>
+          <div className="card-grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5">
             {adsView ? (
               <>
                 <MetricDetailTrigger
@@ -490,7 +490,7 @@ function Courses() {
                 />
               </>
             )}
-          </KpiRow>
+          </div>
 
           <CourseWorkspaceTabs
             mode={workspaceView}
@@ -671,7 +671,7 @@ function CourseWorkspaceTabs({
           type="button"
           onClick={() => onChange(tab.key)}
           aria-pressed={active === tab.key}
-          className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-medium transition-colors ${
+          className={`flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-xs font-bold transition-colors ${
             active === tab.key
               ? "bg-brand text-white shadow-sm"
               : "text-text-muted hover:bg-surface-2 hover:text-text"
@@ -710,10 +710,10 @@ function CourseSnapshotCards({
     <section className="rounded-2xl border border-border bg-surface p-3 shadow-sm sm:p-4">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-[12px] font-medium text-brand">
+          <p className="text-[12px] font-bold uppercase tracking-[0.16em] text-brand">
             {lang === "ar" ? "نظرة سريعة" : "Quick glance"}
           </p>
-          <h2 className="text-base font-medium text-text">
+          <h2 className="text-base font-bold text-text">
             {mode === "ads"
               ? lang === "ar"
                 ? "أعلى 3 كورسات إنفاقًا"
@@ -736,10 +736,10 @@ function CourseSnapshotCards({
             data-tone={index === 1 ? "mint" : "violet"}
           >
             <div className="course-snapshot-head flex items-center justify-between gap-2 px-4 py-3">
-              <h3 className="truncate text-sm font-medium text-text" title={course.name}>
+              <h3 className="truncate text-sm font-bold text-text" title={course.name}>
                 {course.name}
               </h3>
-              <span className="course-snapshot-rank num grid h-7 w-7 place-items-center rounded-lg text-[12px] font-medium">
+              <span className="course-snapshot-rank num grid h-7 w-7 place-items-center rounded-lg text-[12px] font-bold">
                 {index + 1}
               </span>
             </div>
@@ -753,7 +753,7 @@ function CourseSnapshotCards({
                     ? "إجمالي التحصيل"
                     : "Total collections"}
               </p>
-              <div className="num mt-1 truncate text-xl font-medium text-text">
+              <div className="num mt-1 truncate text-xl font-bold text-text">
                 {mode === "ads" ? fmtUSD(course.spend) : fmtUSD(course.revenue)}
               </div>
               <div className="mt-2 flex items-center justify-between border-t border-border/65 pt-2 text-[12px] text-text-muted">
@@ -774,13 +774,12 @@ function CourseSnapshotCards({
                 <span className="font-semibold text-brand">
                   {lang === "ar" ? "تكلفة ليد CRM" : "CRM cost per lead"}
                 </span>
-                <span className="num font-medium text-text">
+                <span className="num font-bold text-text">
                   {fmtUSDFull(courseCrmCpl(course.spend, course.crmLeads))}
                 </span>
               </div>
               <p className="mt-1 text-[11px] text-text-subtle">
-                {lang === "ar" ? "الصرف ÷" : "Spend ÷"} {fmtNum(course.crmLeads)}{" "}
-                {lang === "ar" ? "ليد CRM" : "CRM leads"}
+                {lang === "ar" ? "الصرف ÷" : "Spend ÷"} {fmtNum(course.crmLeads)} {lang === "ar" ? "ليد CRM" : "CRM leads"}
               </p>
             </div>
           </article>
@@ -872,10 +871,10 @@ function CoursePortfolioNavigator({
                 <LayoutGrid size={20} />
               </span>
               <div>
-                <p className="text-[12px] font-medium text-brand">
+                <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-brand">
                   {lang === "ar" ? "Course command center" : "Course command center"}
                 </p>
-                <h2 className="text-lg font-medium text-text sm:text-xl">
+                <h2 className="text-lg font-bold text-text sm:text-xl">
                   {mode === "ads"
                     ? lang === "ar"
                       ? "إعلانات كل كورس في مكانها"
@@ -915,7 +914,7 @@ function CoursePortfolioNavigator({
                   key={key}
                   onClick={() => setRank(key)}
                   aria-pressed={rank === key}
-                  className={`min-h-8 shrink-0 rounded-lg px-2.5 text-[12px] font-medium transition-colors ${
+                  className={`min-h-8 shrink-0 rounded-lg px-2.5 text-[12px] font-bold transition-colors ${
                     rank === key
                       ? "bg-brand text-white"
                       : "text-text-muted hover:bg-surface-2 hover:text-text"
@@ -944,12 +943,12 @@ function CoursePortfolioNavigator({
                 aria-pressed={selected}
                 data-selected={selected ? "" : undefined}
                 data-tone={index % 3 === 0 ? "sky" : index % 3 === 1 ? "mint" : "violet"}
-                className="course-portfolio-card group relative overflow-hidden rounded-2xl border text-start transition-colors duration-200 hover:-translate-y-0.5"
+                className="course-portfolio-card group relative overflow-hidden rounded-2xl border text-start transition-all duration-200 hover:-translate-y-0.5"
               >
                 <div className="course-card-head flex items-start justify-between gap-3 p-4">
                   <div className="flex min-w-0 items-start gap-2.5">
                     <span
-                      className={`num grid h-8 w-8 shrink-0 place-items-center rounded-xl text-[12px] font-medium ${
+                      className={`num grid h-8 w-8 shrink-0 place-items-center rounded-xl text-[12px] font-bold ${
                         rankPosition === 1
                           ? "bg-amber-400 text-amber-950"
                           : "bg-surface-2 text-text-muted"
@@ -958,7 +957,7 @@ function CoursePortfolioNavigator({
                       {rankPosition}
                     </span>
                     <div className="min-w-0">
-                      <h3 className="truncate text-base font-medium text-text" title={course.name}>
+                      <h3 className="truncate text-base font-bold text-text" title={course.name}>
                         {course.name}
                       </h3>
                       <p
@@ -970,7 +969,7 @@ function CoursePortfolioNavigator({
                     </div>
                   </div>
                   <span
-                    className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[12px] font-medium ${
+                    className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[12px] font-bold ${
                       course.spend > 0
                         ? "bg-emerald-500/10 text-emerald-700"
                         : "bg-surface-2 text-text-subtle"
@@ -1016,14 +1015,13 @@ function CoursePortfolioNavigator({
                 </div>
 
                 <div className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-xl border border-brand/20 bg-brand-soft px-3 py-2.5">
-                  <span className="min-w-0 text-[12px] font-medium text-brand">
+                  <span className="min-w-0 text-[12px] font-bold text-brand">
                     {lang === "ar" ? "تكلفة ليد CRM" : "CRM cost per lead"}
                     <span className="mt-0.5 block text-[11px] font-medium text-text-muted">
-                      {fmtUSD(course.spend)} ÷ {fmtNum(course.crmLeads)}{" "}
-                      {lang === "ar" ? "ليد" : "leads"}
+                      {fmtUSD(course.spend)} ÷ {fmtNum(course.crmLeads)} {lang === "ar" ? "ليد" : "leads"}
                     </span>
                   </span>
-                  <span className="num text-base font-medium text-text">
+                  <span className="num text-base font-bold text-text">
                     {fmtUSDFull(courseCrmCpl(course.spend, course.crmLeads))}
                   </span>
                 </div>
@@ -1038,7 +1036,7 @@ function CoursePortfolioNavigator({
                   <span className="font-semibold text-text-muted">
                     {COURSE_RANKS[rank][lang]}: {formatCourseRankValue(course, rank)}
                   </span>
-                  <span className="inline-flex items-center gap-1 font-medium text-brand">
+                  <span className="inline-flex items-center gap-1 font-bold text-brand">
                     <Sparkles size={10} />
                     {selected
                       ? lang === "ar"
@@ -1070,7 +1068,7 @@ function CoursePortfolioNavigator({
         <button
           type="button"
           onClick={() => setExpanded((value) => !value)}
-          className="flex min-h-11 w-full items-center justify-center gap-2 border-t border-border bg-surface-2/35 px-4 text-xs font-medium text-brand hover:bg-brand-soft/30"
+          className="flex min-h-11 w-full items-center justify-center gap-2 border-t border-border bg-surface-2/35 px-4 text-xs font-bold text-brand hover:bg-brand-soft/30"
         >
           <BookOpenCheck size={15} />
           {expanded
@@ -1099,7 +1097,7 @@ function CourseCardMetric({
     <div className="min-w-0">
       <div className="text-[12px] text-text-muted">{label}</div>
       <div
-        className={`num mt-0.5 truncate text-sm text-text ${strong ? "font-medium" : "font-semibold"}`}
+        className={`num mt-0.5 truncate text-sm text-text ${strong ? "font-bold" : "font-semibold"}`}
       >
         {value}
       </div>
@@ -1282,7 +1280,7 @@ function CourseLeadMonitor({ report }: { report: CourseLeadAlertReport }) {
           </div>
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[1120px] text-start text-xs">
-              <thead className="bg-surface-2/75 text-[12px] font-medium text-text-muted">
+              <thead className="bg-surface-2/75 text-[12px] font-semibold text-text-muted">
                 <tr>
                   <th className="px-4 py-3 text-start">{lang === "ar" ? "الدورة" : "Course"}</th>
                   <th className="px-3 py-3 text-center">
@@ -1582,7 +1580,7 @@ function CourseDetailPanel({
               <GraduationCap size={21} />
             </span>
             <div className="min-w-0">
-              <p className="text-[12px] font-medium text-text-muted">
+              <p className="text-[12px] font-semibold uppercase tracking-wide text-text-muted">
                 {mode === "ads"
                   ? lang === "ar"
                     ? "تفاصيل إعلانات الكورس"
@@ -1676,7 +1674,7 @@ function CourseDetailPanel({
               key={tab.key}
               onClick={() => setDetailTab(tab.key)}
               aria-pressed={detailTab === tab.key}
-              className={`flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium ${
+              className={`flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[12px] font-bold ${
                 detailTab === tab.key
                   ? "bg-brand text-white"
                   : "text-text-muted hover:bg-surface hover:text-text"
@@ -1968,7 +1966,7 @@ function CampaignCard({
           <div className="mb-2 flex flex-wrap gap-1.5">
             {organic ? (
               <span
-                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-medium"
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold"
                 style={{ background: "var(--success-soft)", color: "var(--success)" }}
               >
                 <Leaf size={11} />
@@ -1978,7 +1976,7 @@ function CampaignCard({
               campaign.platforms.map((platform) => (
                 <span
                   key={platform}
-                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-medium"
+                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold"
                   style={{
                     background: `color-mix(in oklab, ${PLATFORM_COLOR[platform]} 14%, transparent)`,
                     color: PLATFORM_COLOR[platform],

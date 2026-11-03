@@ -47,7 +47,7 @@ export function PricingPageHeader({
     <section className="pricing-page-header relative overflow-hidden rounded-2xl border">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-3 px-4 py-3.5 sm:px-5">
         <div className="min-w-[200px] flex-1">
-          <h1 className="text-[19px] font-medium tracking-tight text-white sm:text-[23px]">
+          <h1 className="text-[19px] font-bold tracking-tight text-white sm:text-[23px]">
             {title}
           </h1>
           <p className="mt-0.5 text-[12px] leading-snug text-white/85">{description}</p>
@@ -159,7 +159,7 @@ export function PricingKpiStrip({
                 {item.Icon && (
                   <item.Icon size={12} className="shrink-0 text-text-subtle" aria-hidden="true" />
                 )}
-                <span className="truncate text-[12px] font-medium text-text-muted">
+                <span className="truncate text-[12px] font-semibold text-text-muted">
                   {item.label}
                 </span>
                 {item.info && (
@@ -168,7 +168,7 @@ export function PricingKpiStrip({
                 {item.onSelect && (
                   <span
                     aria-hidden="true"
-                    className={`ms-auto inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[12px] font-medium transition-colors ${
+                    className={`ms-auto inline-flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[12px] font-bold transition-colors ${
                       active
                         ? "bg-brand text-white"
                         : "bg-surface-2 text-text-subtle group-hover:bg-brand-soft group-hover:text-brand"
@@ -188,7 +188,7 @@ export function PricingKpiStrip({
                         1,780 EGP"). Clipping it would hide money, so the type
                         steps down instead and the figure stays whole. */}
                   <span
-                    className={`num min-w-0 font-medium leading-tight tracking-tight ${
+                    className={`num min-w-0 font-bold leading-tight tracking-tight ${
                       item.value.length > 20
                         ? "text-[12.5px]"
                         : item.value.length > 13
@@ -248,7 +248,7 @@ export function PricingDrilldownBar({ item, onClear }: { item: PricingKpi; onCle
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-            <span className="text-[12px] font-medium text-brand">
+            <span className="text-[12px] font-bold uppercase tracking-wide text-brand">
               {ar ? "تعرض الآن" : "Showing now"}
             </span>
             <strong className="text-[12.5px] text-text">{item.label}</strong>
@@ -258,14 +258,14 @@ export function PricingDrilldownBar({ item, onClear }: { item: PricingKpi; onCle
           </p>
         </div>
 
-        <span className="num hidden shrink-0 rounded-lg bg-surface px-2.5 py-1 text-[13px] font-medium text-brand shadow-sm ring-1 ring-border sm:inline-flex">
+        <span className="num hidden shrink-0 rounded-lg bg-surface px-2.5 py-1 text-[13px] font-bold text-brand shadow-sm ring-1 ring-border sm:inline-flex">
           {item.value}
         </span>
 
         <button
           type="button"
           onClick={onClear}
-          className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border bg-surface px-2.5 text-[12px] font-medium text-text-muted transition-colors hover:border-brand/40 hover:bg-brand-soft hover:text-brand"
+          className="inline-flex min-h-9 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border bg-surface px-2.5 text-[12px] font-semibold text-text-muted transition-colors hover:border-brand/40 hover:bg-brand-soft hover:text-brand"
         >
           <X size={13} aria-hidden="true" />
           <span className="hidden sm:inline">{ar ? "إلغاء التحديد" : "Clear selection"}</span>
@@ -294,7 +294,7 @@ function KpiDelta({ value, invert }: { value?: number; invert?: boolean }) {
   const color = flat ? "var(--text-subtle)" : good ? "var(--success)" : "var(--danger)";
   return (
     <span
-      className="num inline-flex shrink-0 items-center gap-0.5 text-[12px] font-medium"
+      className="num inline-flex shrink-0 items-center gap-0.5 text-[12px] font-semibold"
       style={{ color }}
       title={lang === "ar" ? "مقارنة بالفترة السابقة" : "vs the previous period"}
     >
@@ -377,7 +377,7 @@ export function PricingTabBar<T extends string>({
               <span className="whitespace-nowrap">{tabLabel}</span>
               {!!badge && (
                 <span
-                  className="num grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[12px] font-medium text-white"
+                  className="num grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[12px] font-bold text-white"
                   style={{ background: "var(--danger)" }}
                 >
                   {badge}

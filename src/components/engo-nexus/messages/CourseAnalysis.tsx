@@ -100,7 +100,9 @@ export function CourseAnalysis({
       {message.campaigns.length > 0 ? (
         <section>
           <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
-            <h4 className="text-xs font-medium text-text-muted">{t.campaigns}</h4>
+            <h4 className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+              {t.campaigns}
+            </h4>
             {message.campaigns.length > 3 ? (
               <div className="flex gap-1" data-testid="nexus-campaign-filters">
                 {(
@@ -186,7 +188,9 @@ export function CourseAnalysis({
 
       {message.products.length > 0 ? (
         <section>
-          <h4 className="mb-1.5 text-xs font-medium text-text-muted">{t.products}</h4>
+          <h4 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-text-muted">
+            {t.products}
+          </h4>
           {productMode === "cards" ? (
             <div className="space-y-2">
               {message.products.map((product) => (

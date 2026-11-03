@@ -93,10 +93,10 @@ function CohortCard({
       className={`rounded-xl border bg-surface-2/65 p-3 text-start transition hover:border-mint-strong/50 hover:bg-surface-2 ${selected ? "border-mint-strong ring-1 ring-mint-strong/25" : "border-border"}`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[12px] font-medium text-text-muted">{label}</span>
-        <span className="num text-[15px] font-medium text-text">{pct(share, lang)}</span>
+        <span className="text-[12px] font-semibold text-text-muted">{label}</span>
+        <span className="num text-[15px] font-bold text-text">{pct(share, lang)}</span>
       </div>
-      <div className="num mt-2 text-[18px] font-medium tracking-tight text-text">
+      <div className="num mt-2 text-[18px] font-bold tracking-tight text-text">
         {value === null ? "—" : fmtUSDFull(value)}
       </div>
       {leads !== undefined && (
@@ -105,7 +105,7 @@ function CohortCard({
         </div>
       )}
       <ShareBar value={share} tone={tone} />
-      <span className="mt-2 inline-flex items-center gap-1 text-[12px] font-medium text-mint-strong">
+      <span className="mt-2 inline-flex items-center gap-1 text-[12px] font-semibold text-mint-strong">
         {lang === "ar" ? "اضغط لعرض المصادر" : "Click to inspect sources"}
         <ArrowDownLeft size={12} />
       </span>
@@ -228,12 +228,12 @@ export function OverviewSalesAttribution({
       }
     >
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2 rounded-xl border border-border bg-surface-2/45 px-4 py-3">
-        <div className="text-[12px] font-medium text-text-muted">
+        <div className="text-[12px] font-semibold text-text-muted">
           {A
             ? "إجمالي التحصيل خلال الفترة · حسب تاريخ السداد"
             : "Total collected in selected period · by payment date"}
         </div>
-        <div className="num text-xl font-medium tracking-tight text-text">
+        <div className="num text-xl font-black tracking-tight text-text">
           {fmtUSDFull(attribution.currentPeriodRevenue)}
         </div>
       </div>
@@ -283,7 +283,7 @@ export function OverviewSalesAttribution({
       <div className="mt-3 rounded-xl border border-border bg-surface-2/25 p-3">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
           <div>
-            <div className="text-[12px] font-medium text-text">
+            <div className="text-[12px] font-bold text-text">
               {A ? "المصادر التي كوّنت المبلغ المحدد" : "Sources behind the selected amount"}
             </div>
             <div className="mt-0.5 text-[12px] text-text-muted">
@@ -293,7 +293,7 @@ export function OverviewSalesAttribution({
             </div>
           </div>
           {selectedCohort === "other" && (
-            <span className="rounded-full bg-amber-surface px-2 py-1 text-[12px] font-medium text-amber-strong">
+            <span className="rounded-full bg-amber-surface px-2 py-1 text-[12px] font-semibold text-amber-strong">
               {A ? "غير منسوب لفترة واحدة" : "Not assigned to one period"}
             </span>
           )}
@@ -303,7 +303,7 @@ export function OverviewSalesAttribution({
             <button
               type="button"
               onClick={() => setSelectedReason("all")}
-              className={`rounded-full border px-2.5 py-1 text-[12px] font-medium ${selectedReason === "all" ? "border-text bg-text text-surface" : "border-border bg-surface text-text-muted"}`}
+              className={`rounded-full border px-2.5 py-1 text-[12px] font-semibold ${selectedReason === "all" ? "border-text bg-text text-surface" : "border-border bg-surface text-text-muted"}`}
             >
               {A ? "كل الأنواع" : "All types"}
             </button>
@@ -314,7 +314,7 @@ export function OverviewSalesAttribution({
                   key={reason}
                   type="button"
                   onClick={() => setSelectedReason(reason)}
-                  className={`rounded-full border px-2.5 py-1 text-[12px] font-medium ${selectedReason === reason ? "border-amber-strong bg-amber-surface text-text" : "border-border bg-surface text-text-muted"}`}
+                  className={`rounded-full border px-2.5 py-1 text-[12px] font-semibold ${selectedReason === reason ? "border-amber-strong bg-amber-surface text-text" : "border-border bg-surface text-text-muted"}`}
                 >
                   {sourceReason(reason, lang)}
                   {item ? ` · ${fmtUSDFull(item[1])}` : ""}
@@ -337,7 +337,7 @@ export function OverviewSalesAttribution({
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="truncate text-[12px] font-medium text-text" title={source.name}>
+                    <div className="truncate text-[12px] font-bold text-text" title={source.name}>
                       {source.name === "No campaign"
                         ? A
                           ? "بدون حملة"
@@ -365,7 +365,7 @@ export function OverviewSalesAttribution({
                   />
                 </div>
                 <div className="mt-3 flex items-end justify-between gap-2">
-                  <span className="num text-[14px] font-medium text-text">
+                  <span className="num text-[14px] font-black text-text">
                     {fmtUSDFull(source.revenue)}
                   </span>
                   <span className="text-[12px] text-text-muted">
@@ -528,7 +528,7 @@ export function OverviewSalesAttribution({
                             </div>
                           </td>
                           <td className="px-3 py-2.5 text-text">{line.source || "—"}</td>
-                          <td className="num whitespace-nowrap px-3 py-2.5 text-end font-medium text-text">
+                          <td className="num whitespace-nowrap px-3 py-2.5 text-end font-bold text-text">
                             {fmtUSDFull(line.usdPaid)}
                           </td>
                         </tr>
@@ -544,7 +544,7 @@ export function OverviewSalesAttribution({
                       onClick={() =>
                         setDetailOffset(Math.max(0, detail.data!.offset - detail.data!.limit))
                       }
-                      className="rounded-lg border border-border px-3 py-2 text-[12px] font-medium text-text disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-lg border border-border px-3 py-2 text-[12px] font-semibold text-text disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {A ? "السابق" : "Previous"}
                     </button>
@@ -556,7 +556,7 @@ export function OverviewSalesAttribution({
                       type="button"
                       disabled={detail.data.offset + detail.data.limit >= detail.data.totalLines}
                       onClick={() => setDetailOffset(detail.data!.offset + detail.data!.limit)}
-                      className="rounded-lg border border-border px-3 py-2 text-[12px] font-medium text-text disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-lg border border-border px-3 py-2 text-[12px] font-semibold text-text disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {A ? "التالي" : "Next"}
                     </button>
@@ -600,7 +600,7 @@ export function OverviewSalesAttribution({
                 <p className="text-[12px] font-medium text-text-muted">{A ? "الدورة" : "Course"}</p>
                 <bdi
                   dir="auto"
-                  className="bidi-name block truncate text-[13px] font-medium text-text"
+                  className="bidi-name block truncate text-[13px] font-bold text-text"
                   title={course.course}
                 >
                   {course.course}
@@ -610,7 +610,7 @@ export function OverviewSalesAttribution({
                 <p className="text-[12px] font-medium text-text-muted">
                   {A ? "التحصيل" : "Collected"}
                 </p>
-                <bdi dir="ltr" className="num block text-[14px] font-medium text-text">
+                <bdi dir="ltr" className="num block text-[14px] font-bold text-text">
                   {fmtUSD(course.revenue)}
                 </bdi>
                 <bdi dir="ltr" className="num block text-[12px] text-text-subtle">
@@ -624,7 +624,7 @@ export function OverviewSalesAttribution({
                 <dt className="text-[12px] text-text-muted">
                   {A ? "ليدز / مكسوب" : "Leads / won"}
                 </dt>
-                <dd className="num mt-0.5 text-[12px] font-medium text-text">
+                <dd className="num mt-0.5 text-[12px] font-semibold text-text">
                   {fmtNum(course.leads ?? 0)} / {fmtNum(course.won ?? 0)}
                 </dd>
               </div>
@@ -632,13 +632,13 @@ export function OverviewSalesAttribution({
                 <dt className="text-[12px] text-text-muted">
                   {A ? "معدل الإغلاق" : "Closure rate"}
                 </dt>
-                <dd className="num mt-0.5 text-[12px] font-medium text-text">
+                <dd className="num mt-0.5 text-[12px] font-semibold text-text">
                   {pct(course.closureRate ?? null, lang)}
                 </dd>
               </div>
               <div>
                 <dt className="text-[12px] text-text-muted">{A ? "دوران الليد" : "Lead cycle"}</dt>
-                <dd className="num mt-0.5 text-[12px] font-medium text-text">
+                <dd className="num mt-0.5 text-[12px] font-semibold text-text">
                   {course.avgCloseDays == null
                     ? "—"
                     : `${course.avgCloseDays.toFixed(1)} ${A ? "يوم" : "days"}`}
@@ -653,14 +653,14 @@ export function OverviewSalesAttribution({
               <dl className="mt-1.5 grid grid-cols-3 gap-2">
                 <div>
                   <dt className="text-[12px] text-text-muted">{A ? "حالي" : "Current"}</dt>
-                  <dd className="num text-[12px] font-medium text-text" dir="ltr">
+                  <dd className="num text-[12px] font-semibold text-text" dir="ltr">
                     {fmtUSDFull(course.currentLeadRevenue ?? 0)} ·{" "}
                     {pct(course.currentLeadRevenueShare ?? null, lang)}
                   </dd>
                 </div>
                 <div>
                   <dt className="text-[12px] text-text-muted">{A ? "ماضٍ" : "Previous"}</dt>
-                  <dd className="num text-[12px] font-medium text-text" dir="ltr">
+                  <dd className="num text-[12px] font-semibold text-text" dir="ltr">
                     {fmtUSDFull(course.previousLeadRevenue ?? 0)} ·{" "}
                     {pct(
                       comparisonAvailable ? (course.previousLeadRevenueShare ?? null) : null,
@@ -670,7 +670,7 @@ export function OverviewSalesAttribution({
                 </div>
                 <div>
                   <dt className="text-[12px] text-text-muted">{A ? "مشترك" : "Other"}</dt>
-                  <dd className="num text-[12px] font-medium text-text" dir="ltr">
+                  <dd className="num text-[12px] font-semibold text-text" dir="ltr">
                     {fmtUSDFull(course.otherLeadRevenue ?? 0)} ·{" "}
                     {pct(course.otherLeadRevenueShare ?? null, lang)}
                   </dd>

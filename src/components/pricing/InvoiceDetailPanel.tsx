@@ -103,7 +103,7 @@ export function InvoiceDetailPanel({
             href={data!.odooRecordUrl}
             target="_blank"
             rel="noreferrer noopener"
-            className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-border px-3 text-[12.5px] font-medium text-brand transition-colors hover:bg-brand-soft"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-border px-3 text-[12.5px] font-semibold text-brand transition-colors hover:bg-brand-soft"
           >
             <ExternalLink size={14} aria-hidden="true" />
             {ar ? "فتح السجل الموثّق في أودو" : "Open the verified Odoo record"}
@@ -197,7 +197,7 @@ export function InvoiceDetailPanel({
             {data.lines.map((line) => (
               <li key={line.invoiceLineId} className="rounded-lg border border-border px-3 py-2.5">
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <span className="min-w-0 text-[12px] font-medium text-text">
+                  <span className="min-w-0 text-[12px] font-semibold text-text">
                     <bdi>{line.productName}</bdi>{" "}
                     <span className="num text-text-subtle">({line.productCode || "—"})</span>
                   </span>

@@ -144,7 +144,7 @@ function ChannelPicker() {
         <button
           type="button"
           aria-label={`${lang === "ar" ? "اختيار القنوات" : "Choose channels"}: ${activeLabel}`}
-          className="inline-flex h-11 min-w-11 cursor-pointer items-center gap-2 rounded-xl border border-border bg-surface px-2.5 text-[13px] font-medium text-text transition-[border-color,background,transform] hover:border-brand/45 hover:bg-surface-2 active:scale-[0.97] sm:h-10 sm:min-w-[148px] sm:px-3"
+          className="inline-flex h-11 min-w-11 cursor-pointer items-center gap-2 rounded-xl border border-border bg-surface px-2.5 text-[13px] font-semibold text-text transition-[border-color,background,transform] hover:border-brand/45 hover:bg-surface-2 active:scale-[0.97] sm:h-10 sm:min-w-[148px] sm:px-3"
         >
           <span
             className="size-2 shrink-0 rounded-full shadow-[0_0_0_3px_color-mix(in_oklab,var(--brand)_10%,transparent)]"
@@ -477,7 +477,7 @@ function OverflowMenu({
           <MoreHorizontal size={18} />
           {activeCount > 0 && (
             <span
-              className="absolute -end-1 -top-1 grid min-w-4 place-items-center rounded-full px-1 text-[12px] font-medium text-white num"
+              className="absolute -end-1 -top-1 grid min-w-4 place-items-center rounded-full px-1 text-[12px] font-bold text-white num"
               style={{ background: "var(--accent)" }}
             >
               {activeCount}
@@ -509,7 +509,7 @@ function OverflowMenu({
           <SlidersHorizontal size={16} className="text-brand" />
           <span className="flex-1 text-start">{t("filters")}</span>
           {activeCount > 0 && (
-            <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[12px] font-medium text-brand num">
+            <span className="rounded-full bg-brand-soft px-2 py-0.5 text-[12px] font-bold text-brand num">
               {activeCount}
             </span>
           )}
@@ -557,7 +557,9 @@ function OverflowMenu({
         </Link>
         {data?.fetchedAt && (
           <div className="mt-1 border-t border-border px-2.5 pt-2 pb-1">
-            <div className="text-[12px] font-medium text-text-subtle">{t("data_freshness")}</div>
+            <div className="text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
+              {t("data_freshness")}
+            </div>
             <div className="num mt-0.5 text-[12px] text-text-muted">
               {fmtDateTime(data.fetchedAt, lang)}
             </div>
@@ -785,7 +787,7 @@ function FilterSheet({
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold text-text">{t("filters")}</h2>
               {activeCount > 0 && (
-                <span className="num rounded-full bg-brand-soft px-2 py-0.5 text-[12px] font-medium text-brand">
+                <span className="num rounded-full bg-brand-soft px-2 py-0.5 text-[12px] font-semibold text-brand">
                   {activeCount}
                 </span>
               )}

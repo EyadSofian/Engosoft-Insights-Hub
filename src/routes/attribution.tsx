@@ -700,7 +700,7 @@ function Attribution() {
               ],
             ] as const
           ).map(([key, label, options]) => (
-            <label key={key} className="grid gap-1 text-xs font-medium text-text-muted">
+            <label key={key} className="grid gap-1 text-xs font-semibold text-text-muted">
               {label}
               <select
                 value={localFilters[key]}
@@ -726,7 +726,7 @@ function Attribution() {
               ["branchId", A ? "معرّف الفرع" : "Branch ID"],
             ] as const
           ).map(([key, label]) => (
-            <label key={key} className="grid gap-1 text-xs font-medium text-text-muted">
+            <label key={key} className="grid gap-1 text-xs font-semibold text-text-muted">
               {label}
               <input
                 value={localFilters[key]}

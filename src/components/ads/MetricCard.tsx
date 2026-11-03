@@ -17,7 +17,7 @@ export function VerdictChip({ verdict, label }: { verdict: Verdict; label: strin
   const Icon = v.icon;
   return (
     <span
-      className="verdict-chip inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[12px] font-medium whitespace-nowrap"
+      className="verdict-chip inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[12px] font-semibold whitespace-nowrap"
       style={{ background: v.soft, color: v.color }}
     >
       <Icon size={11} strokeWidth={2.5} />
@@ -173,7 +173,7 @@ export function MetricCard({
               </span>
             )}
             <span
-              className="kpi-label line-clamp-2 text-[12.5px] font-medium leading-snug"
+              className="kpi-label line-clamp-2 text-[12.5px] font-semibold leading-snug"
               style={{ color: "var(--tone-ink)" }}
               title={copy.label}
             >
@@ -184,7 +184,7 @@ export function MetricCard({
         </div>
 
         <div
-          className="num kpi-figure relative mt-2.5 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(0.8rem,14cqi,2.2rem)] font-medium leading-none"
+          className="num kpi-figure relative mt-2.5 overflow-hidden text-ellipsis whitespace-nowrap text-[clamp(0.8rem,14cqi,2.2rem)] font-bold leading-none"
           style={{ color: "var(--tone-ink)" }}
         >
           {unavailable ? <Unavailable reason={unavailableReason} /> : value}
@@ -217,7 +217,7 @@ export function MetricCard({
         {interactive && (
           <div className="relative mt-auto pt-2.5">
             <span
-              className="kpi-cue inline-flex items-center gap-0.5 text-[12px] font-medium"
+              className="kpi-cue inline-flex items-center gap-0.5 text-[12px] font-bold"
               style={{ color: "var(--tone-ink)" }}
             >
               {cue}

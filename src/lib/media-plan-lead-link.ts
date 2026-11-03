@@ -28,10 +28,8 @@ export function mediaPlanRecordMatches(
   bucket?: MediaPlanLifecycleBucket,
   opportunityLost = false,
 ): boolean {
-  return (
-    (!bucket || mediaPlanRecordBucket(row) === bucket) &&
-    (!opportunityLost || isLostOpportunity(row.recordType, row.stage))
-  );
+  return (!bucket || mediaPlanRecordBucket(row) === bucket) &&
+    (!opportunityLost || isLostOpportunity(row.recordType, row.stage));
 }
 
 /** Keep platform delivery and Odoo records distinct: only Odoo fields link a record. */

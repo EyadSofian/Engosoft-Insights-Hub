@@ -23,10 +23,7 @@ function publicOrigin(request: Request): string {
   const configured = process.env.PUBLIC_APP_URL?.trim().replace(/\/+$/, "");
   if (configured) return configured;
 
-  const host =
-    request.headers.get("x-forwarded-host") ||
-    request.headers.get("host") ||
-    new URL(request.url).host;
+  const host = request.headers.get("x-forwarded-host") || request.headers.get("host") || new URL(request.url).host;
   return `https://${host}`;
 }
 
@@ -86,11 +83,7 @@ export const Route = createFileRoute("/api/telegram/setup")({
           const body = (await res.json()) as { ok?: boolean; description?: string };
           if (!res.ok || !body.ok) {
             // Only the description is surfaced; the request URL carries the token.
-            return json({
-              ok: false,
-              error: body.description ?? `Telegram returned ${res.status}`,
-              url,
-            });
+            return json({ ok: false, error: body.description ?? `Telegram returned ${res.status}`, url });
           }
           return json({
             ok: true,

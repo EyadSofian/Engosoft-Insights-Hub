@@ -539,7 +539,7 @@ function WebsiteManagementSources({
                   : "Source not connected; no zero is implied."
             }
             action={
-              <Link to="/landing-pages" className="text-[12px] font-medium text-brand">
+              <Link to="/landing-pages" className="text-[12px] font-bold text-brand">
                 {lang === "ar" ? "فتح التقرير ↗" : "Open report ↗"}
               </Link>
             }
@@ -564,13 +564,13 @@ function WebsiteManagementSources({
                   className="flex items-center justify-between gap-3 rounded-xl bg-surface-2/55 px-3 py-2"
                 >
                   <span
-                    className="min-w-0 truncate text-xs font-medium text-text"
+                    className="min-w-0 truncate text-xs font-semibold text-text"
                     title={row.label}
                   >
                     {row.label}
                   </span>
                   <span className="shrink-0 text-end">
-                    <span className="num block text-sm font-medium text-text">
+                    <span className="num block text-sm font-bold text-text">
                       {fmtNum(row.value)}
                     </span>
                     <span className="block text-[12px] text-text-subtle">{row.detail}</span>
@@ -1044,13 +1044,13 @@ function Website() {
                   role="tab"
                   aria-selected={active}
                   onClick={() => setWebsiteTab(tab.value)}
-                  className={`shrink-0 rounded-xl px-3 py-2.5 text-start transition-colors sm:min-w-0 sm:shrink sm:px-4 ${
+                  className={`shrink-0 rounded-xl px-3 py-2.5 text-start transition-all sm:min-w-0 sm:shrink sm:px-4 ${
                     active
                       ? "bg-surface text-brand shadow-sm ring-1 ring-brand/15"
                       : "text-text-muted hover:bg-surface/70 hover:text-text"
                   }`}
                 >
-                  <span className="flex items-center justify-center gap-2 text-xs font-medium sm:justify-start sm:text-sm">
+                  <span className="flex items-center justify-center gap-2 text-xs font-semibold sm:justify-start sm:text-sm">
                     {tab.icon}
                     <span className="whitespace-nowrap sm:truncate">{tab.label}</span>
                   </span>
@@ -1123,7 +1123,7 @@ function Website() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
                           <h3
-                            className="truncate text-[13px] font-medium text-text"
+                            className="truncate text-[13px] font-semibold text-text"
                             dir="auto"
                             title={campaign.campaign}
                           >
@@ -1133,7 +1133,7 @@ function Website() {
                             {campaign.platforms.map((platform) => (
                               <span
                                 key={platform}
-                                className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[12px] font-medium"
+                                className="inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[12px] font-semibold"
                                 style={{
                                   background: `color-mix(in oklab, ${PLATFORM_COLOR[platform]} 14%, transparent)`,
                                   color: PLATFORM_COLOR[platform],
@@ -1306,10 +1306,10 @@ function Website() {
                       <span className="num shrink-0">{fmtPct(channel.orderShare, 0)}</span>
                     </div>
                     <div className="mt-1 flex items-end justify-between gap-3">
-                      <div className="num text-2xl font-medium text-text">
+                      <div className="num text-2xl font-bold text-text">
                         {fmtNum(channel.orders)}
                       </div>
-                      <div className="num text-xs font-medium text-text-muted">
+                      <div className="num text-xs font-semibold text-text-muted">
                         {fmtUSDFull(channel.revenue)}
                       </div>
                     </div>
@@ -1333,7 +1333,7 @@ function Website() {
                     </div>
                     <div className="rounded-lg bg-surface px-2.5 py-1.5 text-end shadow-sm ring-1 ring-border">
                       <div className="text-[12px] text-text-muted">{copy.averageSheetOrder}</div>
-                      <div className="num text-xs font-medium text-text">
+                      <div className="num text-xs font-semibold text-text">
                         {fmtUSDFull(data.sheetSalesAnalysis.averageOrder)}
                       </div>
                     </div>
@@ -1385,7 +1385,7 @@ function Website() {
                         className="min-w-0 rounded-xl border border-border/80 bg-surface px-3 py-2.5"
                       >
                         <div
-                          className="truncate text-[12px] font-medium text-text"
+                          className="truncate text-[12px] font-semibold text-text"
                           dir="auto"
                           title={displayCourseLabel(course.label)}
                         >
@@ -1665,7 +1665,7 @@ function WebsiteCampaignFact({ label, value }: { label: string; value: React.Rea
   return (
     <div className="min-w-0">
       <dt className="truncate text-[12px] text-text-muted">{label}</dt>
-      <dd className="num mt-0.5 text-[13px] font-medium text-text">{value}</dd>
+      <dd className="num mt-0.5 text-[13px] font-semibold text-text">{value}</dd>
     </div>
   );
 }

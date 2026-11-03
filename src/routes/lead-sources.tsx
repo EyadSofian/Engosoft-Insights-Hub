@@ -88,10 +88,10 @@ function LeadSourcesPage() {
         <>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Card className="border-s-4 border-s-blue-600">
-              <div className="text-xs font-medium text-text-muted">
+              <div className="text-xs font-semibold text-text-muted">
                 {ar ? "العملاء المحتملون المحسوبون" : "Counted potential leads"}
               </div>
-              <div className="num mt-2 text-3xl font-medium text-text">
+              <div className="num mt-2 text-3xl font-bold text-text">
                 {fmtNum(data.eligibleTotal)}
               </div>
               <p className="mt-2 text-xs text-text-muted">
@@ -101,10 +101,10 @@ function LeadSourcesPage() {
               </p>
             </Card>
             <Card className="border-s-4 border-s-rose-500">
-              <div className="text-xs font-medium text-text-muted">
+              <div className="text-xs font-semibold text-text-muted">
                 {ar ? "مصادر ظاهرة خارج العدّ" : "Visible but excluded sources"}
               </div>
-              <div className="num mt-2 text-3xl font-medium text-text">
+              <div className="num mt-2 text-3xl font-bold text-text">
                 {fmtNum(data.excludedTotal)}
               </div>
               <p className="mt-2 text-xs text-text-muted">
@@ -112,10 +112,10 @@ function LeadSourcesPage() {
               </p>
             </Card>
             <Card className="border-s-4 border-s-emerald-600">
-              <div className="text-xs font-medium text-text-muted">
+              <div className="text-xs font-semibold text-text-muted">
                 {ar ? "السجلات الخام بدون Snapchat" : "Raw records excluding Snapchat"}
               </div>
-              <div className="num mt-2 text-3xl font-medium text-text">
+              <div className="num mt-2 text-3xl font-bold text-text">
                 {fmtNum(data.withoutSnapchat)}
               </div>
               <p className="mt-2 text-xs text-text-muted">
@@ -123,10 +123,10 @@ function LeadSourcesPage() {
               </p>
             </Card>
             <Card className="border-s-4 border-s-amber-500">
-              <div className="text-xs font-medium text-text-muted">
+              <div className="text-xs font-semibold text-text-muted">
                 {ar ? "بدون مصدر محدد" : "Unspecified source"}
               </div>
-              <div className="num mt-2 text-3xl font-medium text-text">
+              <div className="num mt-2 text-3xl font-bold text-text">
                 {fmtNum(data.unspecifiedSource)}
               </div>
               <p className="mt-2 text-xs text-text-muted">
@@ -145,10 +145,10 @@ function LeadSourcesPage() {
                 onClick={() => open(row.source)}
                 className="group rounded-2xl border border-rose-200 bg-rose-50/70 p-4 text-start shadow-sm transition hover:-translate-y-0.5 hover:border-rose-400 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-rose-500"
               >
-                <span className="inline-flex rounded-full bg-rose-100 px-2.5 py-1 text-[12px] font-medium text-rose-800">
+                <span className="inline-flex rounded-full bg-rose-100 px-2.5 py-1 text-[12px] font-bold text-rose-800">
                   {row.source}
                 </span>
-                <span className="num mt-3 block text-2xl font-medium text-rose-950">
+                <span className="num mt-3 block text-2xl font-bold text-rose-950">
                   {fmtNum(row.count)}
                 </span>
                 <span className="mt-1 block text-xs text-rose-700">
@@ -161,7 +161,7 @@ function LeadSourcesPage() {
           <Card className="overflow-hidden p-0">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-4 sm:px-5">
               <div>
-                <h2 className="font-medium text-text">
+                <h2 className="font-bold text-text">
                   {ar ? "المصادر × الدورات" : "Sources × courses"}
                 </h2>
                 <p className="mt-1 text-xs text-text-muted">
@@ -186,7 +186,7 @@ function LeadSourcesPage() {
                   <tr>
                     <th
                       scope="col"
-                      className="sticky start-0 z-20 min-w-40 border-b border-e border-border bg-surface-2 px-4 py-3 text-start text-xs font-medium"
+                      className="sticky start-0 z-20 min-w-40 border-b border-e border-border bg-surface-2 px-4 py-3 text-start text-xs font-bold"
                     >
                       {ar ? "المصدر" : "Source"}
                     </th>
@@ -194,14 +194,14 @@ function LeadSourcesPage() {
                       <th
                         key={course}
                         scope="col"
-                        className={`min-w-20 border-b border-border px-3 py-3 text-center text-xs font-medium ${["CFM", "CMRP", "PMP", "BIM", "Interior", "Auto"].includes(course) ? "bg-emerald-50 text-emerald-800" : ""}`}
+                        className={`min-w-20 border-b border-border px-3 py-3 text-center text-xs font-bold ${["CFM", "CMRP", "PMP", "BIM", "Interior", "Auto"].includes(course) ? "bg-emerald-50 text-emerald-800" : ""}`}
                       >
                         <bdi>{courseDisplayName(course, false)}</bdi>
                       </th>
                     ))}
                     <th
                       scope="col"
-                      className="sticky end-0 z-20 min-w-24 border-b border-s border-border bg-blue-50 px-3 py-3 text-center text-xs font-medium text-blue-900"
+                      className="sticky end-0 z-20 min-w-24 border-b border-s border-border bg-blue-50 px-3 py-3 text-center text-xs font-bold text-blue-900"
                     >
                       {ar ? "إجمالي السجلات" : "Raw records"}
                     </th>
@@ -238,7 +238,7 @@ function LeadSourcesPage() {
                           )}
                         </td>
                       ))}
-                      <td className="num sticky end-0 z-10 border-b border-s border-border bg-blue-50 px-3 py-3 text-center font-medium tabular-nums">
+                      <td className="num sticky end-0 z-10 border-b border-s border-border bg-blue-50 px-3 py-3 text-center font-bold tabular-nums">
                         <button
                           type="button"
                           onClick={() => open(row.source)}
@@ -251,7 +251,7 @@ function LeadSourcesPage() {
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="bg-slate-900 font-medium text-white">
+                  <tr className="bg-slate-900 font-bold text-white">
                     <th
                       scope="row"
                       className="sticky start-0 z-10 bg-slate-900 px-4 py-3 text-start"
@@ -288,7 +288,7 @@ function LeadSourcesPage() {
             <Card className="border-s-4 border-s-amber-500">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h2 className="font-medium text-text">
+                  <h2 className="font-bold text-text">
                     {ar ? "مرجع خطة أكتوبر: هدف 6 أيام" : "October plan reference: six-day target"}
                   </h2>
                   <p className="mt-1 text-xs leading-6 text-text-muted">
@@ -299,7 +299,7 @@ function LeadSourcesPage() {
                 </div>
                 <a
                   href="/media-plan"
-                  className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs font-medium text-brand hover:bg-brand/10"
+                  className="inline-flex items-center gap-1 rounded-lg border border-border px-3 py-2 text-xs font-semibold text-brand hover:bg-brand/10"
                 >
                   <ExternalLink size={13} />
                   {ar ? "فتح خطة الميديا" : "Open media plan"}
@@ -308,23 +308,21 @@ function LeadSourcesPage() {
               <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-7">
                 {data.sixDayPlan.courses.map((course) => (
                   <div key={course.label} className="rounded-xl bg-amber-50 px-3 py-2">
-                    <div className="text-xs font-medium text-amber-900">{course.label}</div>
-                    <div className="num mt-1 text-lg font-medium text-text">
+                    <div className="text-xs font-semibold text-amber-900">{course.label}</div>
+                    <div className="num mt-1 text-lg font-bold text-text">
                       {fmtNum(course.target)}
                     </div>
                   </div>
                 ))}
                 <div className="rounded-xl bg-slate-900 px-3 py-2 text-white">
-                  <div className="text-xs font-medium">{ar ? "الإجمالي" : "Total"}</div>
-                  <div className="num mt-1 text-lg font-medium">
-                    {fmtNum(data.sixDayPlan.total)}
-                  </div>
+                  <div className="text-xs font-semibold">{ar ? "الإجمالي" : "Total"}</div>
+                  <div className="num mt-1 text-lg font-bold">{fmtNum(data.sixDayPlan.total)}</div>
                 </div>
               </div>
             </Card>
           )}
           <div className="rounded-xl border border-blue-200 bg-blue-50/60 px-4 py-3 text-xs leading-6 text-slate-700">
-            <div className="inline-flex items-center gap-2 font-medium">
+            <div className="inline-flex items-center gap-2 font-bold">
               <Layers3 size={15} />
               {ar ? "طريقة القراءة" : "How to read"}
             </div>
@@ -383,7 +381,7 @@ function LeadSourcesPage() {
                     href={record.odooUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-brand hover:bg-brand/10"
+                    className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10"
                   >
                     <ExternalLink size={13} />
                     {ar ? "فتح في أودو" : "Open in Odoo"}

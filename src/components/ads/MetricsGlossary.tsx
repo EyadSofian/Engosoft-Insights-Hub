@@ -94,7 +94,7 @@ function MetricsGlossary({ open, onClose }: { open: boolean; onClose: () => void
         <div className="px-3 sm:px-5 py-4 space-y-5">
           {Object.entries(groups).map(([group, keys]) => (
             <section key={group}>
-              <h3 className="text-[12px] font-medium text-text-subtle mb-2 px-1">
+              <h3 className="text-[12px] font-semibold uppercase tracking-wide text-text-subtle mb-2 px-1">
                 {METRIC_GROUP_LABEL[group as keyof typeof METRIC_GROUP_LABEL][lang]}
               </h3>
               <div className="table-wrap rounded-xl border border-border">
@@ -110,7 +110,7 @@ function MetricsGlossary({ open, onClose }: { open: boolean; onClose: () => void
                         <th
                           key={h}
                           scope="col"
-                          className="px-3 py-2 text-start text-[12px] font-medium text-text-muted bg-surface-2 border-b border-border whitespace-nowrap"
+                          className="px-3 py-2 text-start text-[12px] font-semibold uppercase tracking-wide text-text-muted bg-surface-2 border-b border-border whitespace-nowrap"
                         >
                           {h}
                         </th>

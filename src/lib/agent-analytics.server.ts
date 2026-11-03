@@ -1121,13 +1121,12 @@ function mergeCallsHubEmployees(
     const row = matched?.[1] ?? blank(key, source.name);
     const alreadyMatched = row.callsHubMatched;
     row.callExtension ||= source.extension;
-    row.totalCalls = (alreadyMatched ? (row.totalCalls ?? 0) : 0) + source.totalCalls;
+    row.totalCalls = (alreadyMatched ? row.totalCalls ?? 0 : 0) + source.totalCalls;
     // Kept for response compatibility; the UI labels this as all PBX calls.
     row.outboundCalls = row.totalCalls;
-    row.answeredCalls = (alreadyMatched ? (row.answeredCalls ?? 0) : 0) + source.answeredCalls;
-    row.totalCallSeconds =
-      (alreadyMatched ? (row.totalCallSeconds ?? 0) : 0) + source.periodCallSeconds;
-    row.talkSeconds = (alreadyMatched ? (row.talkSeconds ?? 0) : 0) + source.periodTalkSeconds;
+    row.answeredCalls = (alreadyMatched ? row.answeredCalls ?? 0 : 0) + source.answeredCalls;
+    row.totalCallSeconds = (alreadyMatched ? row.totalCallSeconds ?? 0 : 0) + source.periodCallSeconds;
+    row.talkSeconds = (alreadyMatched ? row.talkSeconds ?? 0 : 0) + source.periodTalkSeconds;
     row.averageCallSeconds = row.totalCalls ? row.totalCallSeconds / row.totalCalls : 0;
     row.analyzedCalls = source.analyzedCalls;
     row.averageQualityScore = source.averageScore;

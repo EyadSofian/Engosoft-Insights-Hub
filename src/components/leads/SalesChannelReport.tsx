@@ -145,7 +145,7 @@ export function SalesChannelReport() {
           ].map((item) => (
             <Card key={item.label} className={`border-t-[3px] ${item.tone}`}>
               <div className="text-xs text-text-muted">{item.label}</div>
-              <div className="num mt-2 text-3xl font-medium text-text">
+              <div className="num mt-2 text-3xl font-bold text-text">
                 {item.value.toLocaleString()}
               </div>
             </Card>
@@ -175,7 +175,7 @@ export function SalesChannelReport() {
         <Link
           to="/leads"
           search={{ view: "performance" }}
-          className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-brand hover:underline"
+          className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"
         >
           {t.details}
           <ExternalLink size={13} />

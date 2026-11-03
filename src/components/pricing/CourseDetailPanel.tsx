@@ -74,7 +74,7 @@ export function CourseDetailPanel({
       onClose={onClose}
       eyebrow={
         <>
-          <span className="num rounded bg-surface-2 px-1.5 py-0.5 text-[12px] font-medium text-text-muted">
+          <span className="num rounded bg-surface-2 px-1.5 py-0.5 text-[12px] font-bold text-text-muted">
             <bdi>{entry.rawCode || "—"}</bdi>
           </span>
           <Pill tone="neutral">{deliveryLabel(entry.deliveryType, lang)}</Pill>
@@ -93,7 +93,7 @@ export function CourseDetailPanel({
           <button
             type="button"
             onClick={() => onOpenInvoices(entry.rawCode || entry.code)}
-            className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-medium text-white"
+            className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg px-3 text-[12.5px] font-semibold text-white"
             style={{ background: "var(--brand)" }}
           >
             {ar ? "عرض فواتير هذه الدورة" : "Show this course's invoices"}
@@ -171,7 +171,7 @@ export function CourseDetailPanel({
                   <BadgePercent size={13} aria-hidden="true" />
                   {offer.note || (ar ? "عرض معتمد" : "Approved offer")}
                 </span>
-                <span className="num font-medium">{bandText(offer, lang)}</span>
+                <span className="num font-bold">{bandText(offer, lang)}</span>
                 {offer.validTo && (
                   <span className="num w-full text-[12px] opacity-80">
                     {ar ? "ينتهي في" : "Ends"} {fmtDate(offer.validTo, lang)}
@@ -210,7 +210,7 @@ export function CourseDetailPanel({
             {breachRows.slice(0, 8).map((row) => (
               <li key={row.invoiceLineId} className="rounded-lg border border-border px-3 py-2.5">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="num text-[12px] font-medium text-text">
+                  <span className="num text-[12px] font-bold text-text">
                     <bdi>{row.invoiceNumber}</bdi>
                   </span>
                   <RowStatusBadge row={row} />

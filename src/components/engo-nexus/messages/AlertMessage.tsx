@@ -20,7 +20,7 @@ export function AlertMessage({ message, lang }: { message: AlertMessageType; lan
   const { Icon, box, text } = LEVEL[message.level];
   return (
     <div className={`rounded-xl border px-3 py-2.5 ${box}`} data-testid="nexus-alert">
-      <p className={`flex items-center gap-1.5 text-xs font-medium ${text}`}>
+      <p className={`flex items-center gap-1.5 text-xs font-semibold ${text}`}>
         <Icon className="size-3.5" aria-hidden />
         {message.title}
       </p>
@@ -52,7 +52,7 @@ export function ErrorBubble({
       role="alert"
       data-testid="nexus-error"
     >
-      <p className="flex items-center gap-1.5 text-xs font-medium text-rose-700 dark:text-rose-400">
+      <p className="flex items-center gap-1.5 text-xs font-semibold text-rose-700 dark:text-rose-400">
         <OctagonAlert className="size-3.5" aria-hidden />
         {message.title}
       </p>

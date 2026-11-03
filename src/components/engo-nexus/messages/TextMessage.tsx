@@ -123,11 +123,11 @@ export function ComparisonCard({
       className="rounded-xl border border-border bg-bg-subtle p-3"
       data-testid="nexus-comparison"
     >
-      {message.title && <h4 className="mb-2 text-xs font-medium text-text">{message.title}</h4>}
+      {message.title && <h4 className="mb-2 text-xs font-semibold text-text">{message.title}</h4>}
       <div className="grid grid-cols-2 gap-3">
         {[message.left, message.right].map((side, index) => (
           <div key={index} className="min-w-0 space-y-2">
-            <p className="truncate text-[12px] font-medium text-text-muted">{side.label}</p>
+            <p className="truncate text-[12px] font-semibold text-text-muted">{side.label}</p>
             {side.metrics.map((metric) => (
               <Metric key={`${index}:${metric.key}`} metric={metric} lang={lang} />
             ))}

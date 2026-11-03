@@ -228,7 +228,7 @@ export function PriceCourseSummaryTab({
             role="group"
             aria-label={ar ? "التخصص" : "Specialization"}
           >
-            <span className="pe-1 text-[12px] font-medium text-text-subtle">
+            <span className="pe-1 text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
               {ar ? "التخصص" : "Specialization"}
             </span>
             {["all", ...specializations].map((value) => (
@@ -326,7 +326,7 @@ export function PriceCourseSummaryTab({
 
         {!!activeFilters.length && (
           <div className="flex flex-wrap items-center gap-1.5 border-t border-border px-2.5 py-2">
-            <span className="text-[12px] font-medium text-text-subtle">
+            <span className="text-[12px] font-semibold text-text-subtle">
               {ar ? "الفلاتر الفعّالة" : "Active filters"}
             </span>
             {activeFilters.map((chip) => (
@@ -334,7 +334,7 @@ export function PriceCourseSummaryTab({
                 key={chip.key}
                 type="button"
                 onClick={chip.clear}
-                className="inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-full border border-brand/30 bg-brand-soft px-2.5 text-[12px] font-medium text-brand"
+                className="inline-flex min-h-7 cursor-pointer items-center gap-1 rounded-full border border-brand/30 bg-brand-soft px-2.5 text-[12px] font-semibold text-brand"
               >
                 <bdi className="max-w-[160px] truncate">{chip.label}</bdi>
                 <X size={12} aria-hidden="true" />
@@ -433,7 +433,7 @@ export function PriceCourseSummaryTab({
             >
               <div className="min-w-0">
                 <h2
-                  className={`text-[12.5px] font-medium ${
+                  className={`text-[12.5px] font-bold ${
                     specialization === PRIORITY_GROUP ? "text-brand" : "text-text"
                   }`}
                 >
@@ -469,7 +469,10 @@ export function PriceCourseSummaryTab({
                 ar ? "مصر" : "Egypt",
                 ar ? "الإقبال والحالة" : "Demand & status",
               ].map((heading) => (
-                <span key={heading} className="text-[12px] font-medium text-text-subtle">
+                <span
+                  key={heading}
+                  className="text-[12px] font-semibold uppercase tracking-wide text-text-subtle"
+                >
                   {heading}
                 </span>
               ))}

@@ -126,19 +126,21 @@ export function LostBreakdown({
           <div className="relative grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.85fr)] lg:items-end">
             <div>
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <p className="text-[12px] font-medium text-[#ffadb4]">{t.eyebrow}</p>
+                <p className="text-[12px] font-bold tracking-[0.12em] text-[#ffadb4]">
+                  {t.eyebrow}
+                </p>
                 <span className="rounded-full border border-white/15 px-2.5 py-1 text-[12px] font-medium text-white/70">
                   {t.entryMonth} <bdi className="num text-white">{month}</bdi>
                 </span>
               </div>
               <div className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <strong className="num text-5xl font-medium tracking-[-0.06em] sm:text-6xl">
+                <strong className="num text-5xl font-black tracking-[-0.06em] sm:text-6xl">
                   {fmtNum(cohort.lost)}
                 </strong>
                 <span className="text-base font-semibold text-white/85">{t.headline}</span>
               </div>
               <p className="mt-2 text-sm text-white/65">
-                <bdi className="num font-medium text-white">
+                <bdi className="num font-bold text-white">
                   {rate === null ? "—" : fmtPct(rate, 1)}
                 </bdi>{" "}
                 {t.ofEntries} · <bdi className="num">{fmtNum(cohort.leads)}</bdi>
@@ -147,13 +149,13 @@ export function LostBreakdown({
             <div className="grid grid-cols-2 gap-2.5">
               <div className="rounded-2xl border border-white/15 bg-white/[0.07] p-3.5 sm:p-4">
                 <span className="block text-xs text-white/70">{t.lostLeads}</span>
-                <strong className="num mt-1 block text-[29px] font-medium leading-none text-[#ffb8bd]">
+                <strong className="num mt-1 block text-[29px] font-bold leading-none text-[#ffb8bd]">
                   {fmtNum(cohort.lostLeads)}
                 </strong>
               </div>
               <div className="rounded-2xl border border-white/15 bg-white/[0.07] p-3.5 sm:p-4">
                 <span className="block text-xs text-white/70">{t.lostOpportunities}</span>
-                <strong className="num mt-1 block text-[29px] font-medium leading-none text-[#c6b5ff]">
+                <strong className="num mt-1 block text-[29px] font-bold leading-none text-[#c6b5ff]">
                   {fmtNum(cohort.lostOpportunities)}
                 </strong>
               </div>
@@ -180,7 +182,7 @@ export function LostBreakdown({
                   setQuery("");
                   setExpanded(false);
                 }}
-                className={`min-h-10 shrink-0 rounded-xl px-3.5 text-[12.5px] font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:flex-1 ${dimension === item.id ? "bg-[#10243d] text-white shadow-sm" : "text-text-muted hover:bg-surface-2 hover:text-text"}`}
+                className={`min-h-10 shrink-0 rounded-xl px-3.5 text-[12.5px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:flex-1 ${dimension === item.id ? "bg-[#10243d] text-white shadow-sm" : "text-text-muted hover:bg-surface-2 hover:text-text"}`}
               >
                 {item.label}
               </button>
@@ -204,7 +206,7 @@ export function LostBreakdown({
                 value={sort}
                 onChange={(event) => setSort(event.target.value as SortKey)}
                 aria-label={t.sortedBy}
-                className="max-w-[145px] bg-transparent text-[12.5px] font-medium text-text outline-none"
+                className="max-w-[145px] bg-transparent text-[12.5px] font-semibold text-text outline-none"
               >
                 <option value="lost">{t.sortLost}</option>
                 <option value="rate">{t.sortRate}</option>
@@ -235,7 +237,7 @@ export function LostBreakdown({
                 )
               }
               disabled={!filtered.length}
-              className="ms-auto inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-surface px-3.5 text-[12.5px] font-medium text-text transition-colors hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-45"
+              className="ms-auto inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-surface px-3.5 text-[12.5px] font-semibold text-text transition-colors hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-45"
             >
               <Download size={16} aria-hidden="true" />
               {t.export}
@@ -257,22 +259,22 @@ export function LostBreakdown({
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-2.5">
-                      <span className="num grid size-8 shrink-0 place-items-center rounded-xl bg-rose-surface text-[12px] font-medium text-rose-ink">
+                      <span className="num grid size-8 shrink-0 place-items-center rounded-xl bg-rose-surface text-[12px] font-bold text-rose-ink">
                         {String(index + 1).padStart(2, "0")}
                       </span>
-                      <h3 className="min-w-0 break-words text-[16px] font-medium leading-tight text-text">
+                      <h3 className="min-w-0 break-words text-[16px] font-bold leading-tight text-text">
                         {row.name === "—" ? t.unattributed : row.name}
                       </h3>
                     </div>
                     <div className="shrink-0 text-end">
-                      <strong className="num block text-[25px] font-medium leading-none tracking-[-0.04em] text-rose-ink">
+                      <strong className="num block text-[25px] font-black leading-none tracking-[-0.04em] text-rose-ink">
                         {row.lostRate === null ? "—" : fmtPct(row.lostRate, 1)}
                       </strong>
                       <span className="mt-1 block text-[12px] text-text-muted">{t.rateBasis}</span>
                     </div>
                   </div>
                   <div className="mt-4 flex items-baseline gap-1.5 text-[12px] text-text-muted">
-                    <bdi className="num text-lg font-medium text-text">{fmtNum(row.lost)}</bdi>{" "}
+                    <bdi className="num text-lg font-bold text-text">{fmtNum(row.lost)}</bdi>{" "}
                     {t.lostNow}
                     <span className="mx-1 text-border-strong">/</span>
                     <bdi className="num font-semibold text-text">{fmtNum(row.leads)}</bdi>{" "}
@@ -288,30 +290,28 @@ export function LostBreakdown({
                   </div>
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <div className="flex items-center justify-between gap-2 rounded-xl bg-rose-surface px-3 py-2 text-rose-ink">
-                      <span className="text-[12px] font-medium">{t.lostLeads}</span>
-                      <bdi className="num text-base font-medium">{fmtNum(row.lostLeads)}</bdi>
+                      <span className="text-[12px] font-semibold">{t.lostLeads}</span>
+                      <bdi className="num text-base font-bold">{fmtNum(row.lostLeads)}</bdi>
                     </div>
                     <div className="flex items-center justify-between gap-2 rounded-xl bg-violet-surface px-3 py-2 text-violet-ink">
-                      <span className="text-[12px] font-medium">{t.lostOpportunities}</span>
-                      <bdi className="num text-base font-medium">
-                        {fmtNum(row.lostOpportunities)}
-                      </bdi>
+                      <span className="text-[12px] font-semibold">{t.lostOpportunities}</span>
+                      <bdi className="num text-base font-bold">{fmtNum(row.lostOpportunities)}</bdi>
                     </div>
                   </div>
                   <div className="mt-3 border-t border-border pt-2.5">
-                    <p className="text-[12px] font-medium text-text-muted">{t.reasons}</p>
+                    <p className="text-[12px] font-semibold text-text-muted">{t.reasons}</p>
                     <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[12px] text-text-muted">
                       <span>
                         {t.noAnswer}{" "}
-                        <bdi className="num font-medium text-text">{fmtNum(row.noAnswer)}</bdi>
+                        <bdi className="num font-bold text-text">{fmtNum(row.noAnswer)}</bdi>
                       </span>
                       <span>
                         {t.unreachable}{" "}
-                        <bdi className="num font-medium text-text">{fmtNum(row.unreachable)}</bdi>
+                        <bdi className="num font-bold text-text">{fmtNum(row.unreachable)}</bdi>
                       </span>
                       <span>
                         {t.noInterest}{" "}
-                        <bdi className="num font-medium text-text">{fmtNum(row.noInterest)}</bdi>
+                        <bdi className="num font-bold text-text">{fmtNum(row.noInterest)}</bdi>
                       </span>
                     </div>
                   </div>
@@ -327,7 +327,7 @@ export function LostBreakdown({
             <button
               type="button"
               onClick={() => setExpanded((value) => !value)}
-              className="min-h-10 rounded-xl px-4 text-sm font-medium text-brand hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-brand"
+              className="min-h-10 rounded-xl px-4 text-sm font-bold text-brand hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-brand"
             >
               {expanded ? t.less : `${t.more} (${fmtNum(filtered.length - 12)})`}
             </button>

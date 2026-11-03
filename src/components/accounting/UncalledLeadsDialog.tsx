@@ -515,7 +515,7 @@ export function UncalledLeadsDialog({
                             type="button"
                             disabled={data.leads.page <= 1}
                             onClick={() => setPage((current) => Math.max(1, current - 1))}
-                            className="rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-medium text-text disabled:opacity-40"
+                            className="rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-semibold text-text disabled:opacity-40"
                           >
                             {lang === "ar" ? "السابق" : "Previous"}
                           </button>
@@ -526,7 +526,7 @@ export function UncalledLeadsDialog({
                             type="button"
                             disabled={!data.leads.hasNext}
                             onClick={() => setPage((current) => current + 1)}
-                            className="rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-medium text-text disabled:opacity-40"
+                            className="rounded-lg border border-border px-2.5 py-1.5 text-[12px] font-semibold text-text disabled:opacity-40"
                           >
                             {lang === "ar" ? "التالي" : "Next"}
                           </button>
@@ -709,7 +709,7 @@ export function UncalledLeadsDialog({
                                 href={lead.latestCallUrl}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="rounded-lg border border-brand/20 bg-brand-soft/40 px-2.5 py-1.5 text-[12px] font-medium text-brand hover:bg-brand-soft"
+                                className="rounded-lg border border-brand/20 bg-brand-soft/40 px-2.5 py-1.5 text-[12px] font-semibold text-brand hover:bg-brand-soft"
                               >
                                 {lang === "ar" ? "مكالمة الزميل" : "Colleague's call"}
                                 <ExternalLink size={11} className="ms-1 inline" />
@@ -720,7 +720,7 @@ export function UncalledLeadsDialog({
                                 href={lead.url}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="rounded-lg border border-brand/20 px-2.5 py-1.5 text-[12px] font-medium text-brand hover:bg-brand-soft"
+                                className="rounded-lg border border-brand/20 px-2.5 py-1.5 text-[12px] font-semibold text-brand hover:bg-brand-soft"
                               >
                                 {lang === "ar" ? "فتح الليد" : "Open lead"}
                                 <ExternalLink size={11} className="ms-1 inline" />

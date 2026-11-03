@@ -1006,7 +1006,7 @@ function MediaBuyers() {
                 </div>
               </div>
 
-              <KpiRow flush className="mt-4">
+              <div className="card-grid mt-4 grid-cols-2 sm:grid-cols-4">
                 <MetricDetailTrigger
                   detail={perBuyer.spend}
                   card={{ index: buyerIndex * 4, compact: true }}
@@ -1027,7 +1027,7 @@ function MediaBuyers() {
                   detail={perBuyer.revenue}
                   card={{ index: buyerIndex * 4 + 3, compact: true, hero: true }}
                 />
-              </KpiRow>
+              </div>
 
               <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <Mini

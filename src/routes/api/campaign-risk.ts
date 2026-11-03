@@ -4,8 +4,9 @@ export const Route = createFileRoute("/api/campaign-risk")({
   server: {
     handlers: {
       GET: async () => {
-        const { getDefaultRange, getFiltered, computeRecentCampaignActivity } =
-          await import("@/lib/metrics.server");
+        const { getDefaultRange, getFiltered, computeRecentCampaignActivity } = await import(
+          "@/lib/metrics.server"
+        );
         const { json } = await import("@/lib/api.server");
         const range = await getDefaultRange();
         const current = await getFiltered(range);

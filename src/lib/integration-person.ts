@@ -60,7 +60,9 @@ export function integrationPersonMatchScore(left: string, right: string): number
   if (leftTokens.length < 2 || rightTokens.length < 2) return 0;
   if (leftTokens.join(" ") === rightTokens.join(" ")) return 3;
   const [shorter, longer] =
-    leftTokens.length <= rightTokens.length ? [leftTokens, rightTokens] : [rightTokens, leftTokens];
+    leftTokens.length <= rightTokens.length
+      ? [leftTokens, rightTokens]
+      : [rightTokens, leftTokens];
   if (shorter.every((token, index) => longer[index] === token)) return 2;
   const remaining = [...longer];
   for (const token of shorter) {

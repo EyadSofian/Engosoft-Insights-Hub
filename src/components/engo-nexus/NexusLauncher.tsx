@@ -9,10 +9,11 @@ import { nexusStore } from "./state/nexus-store";
  * right in LTR and the left in RTL, so it always lands on the corner opposite
  * the sidebar without any manual RTL branching.
  *
- * It used to be a glossy orb pinned to the bottom corner of every page: a
- * navy-to-blue gradient ball with a cyan glow ring, drifting up and down for
- * the whole shift. It now sits in the navigation rail, where the rest of the
- * places you can go already live, as a row like the others.
+ * MOTION: a slow, low-amplitude float, and nothing else. A launcher that
+ * bounces continuously in a manager's peripheral vision for an eight-hour shift
+ * is an irritation, not an invitation. `motion-reduce:` disables it entirely
+ * for anyone who has asked the OS for less motion — the ring and the badge stay,
+ * so no information is carried by movement alone.
  */
 export function NexusLauncher({ hidden }: { hidden?: boolean }) {
   const { lang } = useI18n();
@@ -28,22 +29,26 @@ export function NexusLauncher({ hidden }: { hidden?: boolean }) {
       title={label}
       data-testid="nexus-launcher"
       className={[
-        "group relative flex min-h-9 w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5",
-        "text-start text-[13px] font-normal text-nav-text-muted",
-        "transition-colors hover:bg-nav-hover hover:text-nav-text",
+        "group fixed z-50 grid size-14 place-items-center rounded-full",
+        "bg-gradient-to-br from-[#0B2545] to-[#1656a0] shadow-lg shadow-brand/25",
+        "transition duration-200 hover:scale-105 active:scale-95",
         "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand",
         "nexus-float motion-reduce:animate-none",
+        // Clears the iOS home bar; a little more room from sm up.
+        "bottom-[calc(env(safe-area-inset-bottom,0px)+1rem)] end-4",
+        "sm:bottom-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] sm:end-6",
       ].join(" ")}
     >
-      <span className="relative grid size-5 shrink-0 place-items-center">
-        <Mascot variant="avatar" className="size-5 rounded-full" />
-        {/* Online dot: the assistant is reachable. Not a notification count. */}
-        <span
-          className="absolute -bottom-px -end-px size-1.5 rounded-full bg-emerald-500"
-          aria-hidden
-        />
-      </span>
-      <span className="truncate">{label}</span>
+      <span
+        className="absolute inset-0 rounded-full ring-2 ring-[#38bdf8]/30 transition group-hover:ring-[#38bdf8]/60"
+        aria-hidden
+      />
+      <Mascot variant="avatar" className="size-11 rounded-full" />
+      {/* Online dot: the assistant is reachable. Not a notification count. */}
+      <span
+        className="absolute bottom-0.5 end-0.5 size-3 rounded-full border-2 border-white bg-emerald-500 dark:border-[#0B2545]"
+        aria-hidden
+      />
     </button>
   );
 }

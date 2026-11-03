@@ -173,7 +173,7 @@ export function Metric({
 }) {
   return (
     <div>
-      <div className="text-[12px] text-text-muted">{label}</div>
+      <div className="text-[12px] uppercase tracking-wide text-text-muted">{label}</div>
       <div className="num text-lg font-semibold text-text mt-0.5">{children}</div>
       {hint && <div className="text-[12px] text-text-muted mt-0.5">{hint}</div>}
     </div>

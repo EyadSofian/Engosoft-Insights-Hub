@@ -126,7 +126,7 @@ function LeadDistributionPage() {
               <div className="text-xs text-text-muted">
                 {ar ? "إجمالي الفرص البيعية" : "Total opportunities"}
               </div>
-              <div className="num mt-2 text-2xl font-medium text-violet-800">
+              <div className="num mt-2 text-2xl font-bold text-violet-800">
                 {fmtNum(data.lifecycle.opportunities)}
               </div>
               <div className="mt-1 text-[12px] text-text-muted">
@@ -139,13 +139,13 @@ function LeadDistributionPage() {
               <div className="text-xs text-text-muted">
                 {lifecycleDisplayName("lead_active", ar)}
               </div>
-              <div className="num mt-2 text-2xl font-medium text-text">
+              <div className="num mt-2 text-2xl font-bold text-text">
                 {fmtNum(data.lifecycle.leadActive)}
               </div>
             </Card>
             <Card className="border-s-4 border-s-rose-500">
               <div className="text-xs text-text-muted">{lifecycleDisplayName("lead_lost", ar)}</div>
-              <div className="num mt-2 text-2xl font-medium text-text">
+              <div className="num mt-2 text-2xl font-bold text-text">
                 {fmtNum(data.lifecycle.leadLost)}
               </div>
               <div className="mt-1 text-[12px] text-text-muted">
@@ -156,7 +156,7 @@ function LeadDistributionPage() {
               <div className="text-xs text-text-muted">
                 {ar ? "إجمالي سجلات الليد والفرص" : "All lead and opportunity records"}
               </div>
-              <div className="num mt-2 text-2xl font-medium text-text">{fmtNum(data.total)}</div>
+              <div className="num mt-2 text-2xl font-bold text-text">{fmtNum(data.total)}</div>
               <div className="mt-1 text-[12px] text-text-muted">
                 {ar ? "ليس عدد الفرص وحدها" : "Not the opportunity count alone"}
               </div>
@@ -165,7 +165,7 @@ function LeadDistributionPage() {
               <div className="text-xs text-text-muted">
                 {ar ? "فرص بيعية مفقودة" : "Lost opportunities"}
               </div>
-              <div className="num mt-2 text-2xl font-medium text-fuchsia-800">
+              <div className="num mt-2 text-2xl font-bold text-fuchsia-800">
                 {fmtNum(data.lifecycle.opportunityLost)}
               </div>
               <div className="mt-1 text-[12px] text-text-muted">
@@ -317,7 +317,7 @@ function LeadDistributionPage() {
                             </span>
                           )}
                         </th>
-                        <td className="num px-3 pt-4 pb-2 text-center font-medium">
+                        <td className="num px-3 pt-4 pb-2 text-center font-bold">
                           <button
                             type="button"
                             onClick={() => open(group)}
@@ -469,7 +469,7 @@ function LeadDistributionPage() {
                     href={row.odooUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-brand hover:bg-brand/10"
+                    className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10"
                   >
                     <ExternalLink size={13} />
                     {ar ? "فتح في أودو" : "Open in Odoo"}

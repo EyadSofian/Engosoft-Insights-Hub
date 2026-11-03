@@ -102,10 +102,10 @@ export function NexusNotificationCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div>
-              <p className={`text-[12px] font-medium ${presentation.eyebrow}`}>
+              <p className={`text-[12px] font-semibold ${presentation.eyebrow}`}>
                 {ar ? presentation.ar : presentation.en}
               </p>
-              <h2 className="mt-0.5 text-sm font-medium text-text">{notice.title}</h2>
+              <h2 className="mt-0.5 text-sm font-bold text-text">{notice.title}</h2>
             </div>
             <button
               type="button"
@@ -132,7 +132,7 @@ export function NexusNotificationCard({
             type="button"
             disabled={disabled}
             onClick={() => onSend(action.prompt)}
-            className="rounded-full border border-border bg-bg px-2.5 py-1.5 text-[12px] font-medium text-text transition hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-full border border-border bg-bg px-2.5 py-1.5 text-[12px] font-semibold text-text transition hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-50"
           >
             {action.label}
           </button>

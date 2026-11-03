@@ -173,7 +173,9 @@ export function setProactiveOptOut(off: boolean): void {
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Whether the proactive popup may appear on this surface, right now. */
-export function canShowProactive(options: { surface?: string | null; now?: number } = {}): boolean {
+export function canShowProactive(
+  options: { surface?: string | null; now?: number } = {},
+): boolean {
   const now = options.now ?? Date.now();
   const surface = options.surface ?? null;
 
@@ -203,9 +205,7 @@ export function rememberProactiveShown(surface: string | null, now: number = Dat
   writeMemory({
     ...memory,
     shownAt,
-    shownSurfaces: surface
-      ? { ...(memory.shownSurfaces ?? {}), [surface]: now }
-      : memory.shownSurfaces,
+    shownSurfaces: surface ? { ...(memory.shownSurfaces ?? {}), [surface]: now } : memory.shownSurfaces,
   });
 }
 

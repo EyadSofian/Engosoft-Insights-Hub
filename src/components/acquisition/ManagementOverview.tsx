@@ -465,7 +465,7 @@ export function RevenueReconciliationCard({
   const figure = (value: number) => (loading ? "…" : fmtUSD(value));
   const block = (title: string, note: string, rec: NonNullable<typeof r>["paymentDate"]) => (
     <div className="rounded-xl bg-surface-2 p-3">
-      <div className="text-xs font-medium text-text">{title}</div>
+      <div className="text-xs font-semibold text-text">{title}</div>
       <div className="mt-0.5 text-[12px] text-text-muted">{note}</div>
       <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
         {(
@@ -597,8 +597,10 @@ export function SimpleFunnel({ data, loading }: { data?: ClosedLoopResponse; loa
               step.count !== undefined && previous ? (step.count / previous) * 100 : null;
             return (
               <li key={step.key} className="relative rounded-xl bg-surface-2 p-3">
-                <div className="text-[12px] font-medium text-text-muted">{step.label}</div>
-                <div className="num mt-1 text-lg font-medium text-text">
+                <div className="text-[12px] font-semibold uppercase tracking-wide text-text-muted">
+                  {step.label}
+                </div>
+                <div className="num mt-1 text-lg font-bold text-text">
                   {loading ? "…" : step.value}
                 </div>
                 <div className="mt-0.5 min-h-4 text-[12px] text-text-muted">
@@ -689,14 +691,12 @@ export function BestPerformers({
           )
         ) : null}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 text-[12px] font-medium text-text-muted">
+          <div className="flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-wide text-text-muted">
             {props.icon}
             {props.eyebrow}
           </div>
           <div className="mt-1 line-clamp-2 text-sm font-semibold text-text">{props.title}</div>
-          <div className="num mt-1 text-lg font-medium text-text">
-            {loading ? "…" : props.value}
-          </div>
+          <div className="num mt-1 text-lg font-bold text-text">{loading ? "…" : props.value}</div>
           {props.lines.map((line) => (
             <div key={line} className="text-xs text-text-muted">
               {line}
@@ -799,7 +799,9 @@ export function CheapVersusQuality({
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <div className="text-[12px] font-medium text-text-muted">{title}</div>
+        <div className="text-[12px] font-semibold uppercase tracking-wide text-text-muted">
+          {title}
+        </div>
         <div className="line-clamp-1 text-sm font-semibold text-text">
           {row?.creativeName ?? "…"}
         </div>
@@ -934,7 +936,7 @@ export function DataCoverageCard({
           <button
             type="button"
             onClick={onViewDetails}
-            className="text-xs font-medium text-brand hover:underline"
+            className="text-xs font-semibold text-brand hover:underline"
           >
             {A ? "عرض التفاصيل التقنية" : "View technical details"}
           </button>
@@ -972,7 +974,7 @@ export function DataCoverageCard({
                   {A ? SIMPLE_LABEL[item.key]!.ar : SIMPLE_LABEL[item.key]!.en}
                 </span>
                 <span
-                  className={`num ms-auto text-end text-sm font-medium ${tone === "bad" ? "text-danger" : tone === "wait" ? "text-text-muted" : "text-text"}`}
+                  className={`num ms-auto text-end text-sm font-bold ${tone === "bad" ? "text-danger" : tone === "wait" ? "text-text-muted" : "text-text"}`}
                 >
                   {value}
                 </span>
@@ -1155,7 +1157,7 @@ export function LeadSourceCards({
             <>
               <div className="flex items-center justify-between gap-2">
                 <span
-                  className="text-[12px] font-medium"
+                  className="text-[12px] font-semibold"
                   style={{ color: "var(--tone-ink)", opacity: 0.8 }}
                 >
                   {source.label[lang]}
@@ -1163,7 +1165,7 @@ export function LeadSourceCards({
                 <Pill tone="neutral">{A ? "افتح" : "Open"}</Pill>
               </div>
               <div
-                className="num mt-2 text-[26px] font-medium leading-none"
+                className="num mt-2 text-[26px] font-bold leading-none"
                 style={{ color: "var(--tone-ink)" }}
               >
                 {loading ? "…" : fmtNum(total)}

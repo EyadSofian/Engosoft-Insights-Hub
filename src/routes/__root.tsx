@@ -33,7 +33,7 @@ function NotFoundComponent() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-bg px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-7xl font-medium text-text num">404</h1>
+        <h1 className="text-7xl font-bold text-text num">404</h1>
         <h2 className="mt-4 text-xl font-semibold text-text">Page not found</h2>
         <div className="mt-6">
           <Link

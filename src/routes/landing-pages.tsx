@@ -399,7 +399,7 @@ function LandingPages() {
       >
         <Card className="space-y-3" padded>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-            <label className="grid gap-1 text-[12px] font-medium text-text-muted">
+            <label className="grid gap-1 text-[12px] font-semibold text-text-muted">
               {A ? "من" : "From"}
               <input
                 type="date"
@@ -408,7 +408,7 @@ function LandingPages() {
                 className="min-h-10 rounded-xl border border-border bg-surface px-3 text-xs text-text outline-none focus:border-brand"
               />
             </label>
-            <label className="grid gap-1 text-[12px] font-medium text-text-muted">
+            <label className="grid gap-1 text-[12px] font-semibold text-text-muted">
               {A ? "إلى" : "To"}
               <input
                 type="date"
@@ -417,7 +417,7 @@ function LandingPages() {
                 className="min-h-10 rounded-xl border border-border bg-surface px-3 text-xs text-text outline-none focus:border-brand"
               />
             </label>
-            <label className="grid gap-1 text-[12px] font-medium text-text-muted">
+            <label className="grid gap-1 text-[12px] font-semibold text-text-muted">
               {A ? "منظور اللمسة" : "Touch view"}
               <select
                 value={touch}
@@ -428,7 +428,7 @@ function LandingPages() {
                 <option value="latest">{A ? "آخر لمسة" : "Latest touch"}</option>
               </select>
             </label>
-            <div className="grid gap-1 text-[12px] font-medium text-text-muted">
+            <div className="grid gap-1 text-[12px] font-semibold text-text-muted">
               <span>{A ? "معرّف الصفحة" : "Page ID"}</span>
               {filterInput(
                 landingPageId,
@@ -628,13 +628,13 @@ function LandingPages() {
                 <div className="text-xs text-text-muted">
                   {A ? "الأحداث المستلمة" : "Events received"}
                 </div>
-                <div className="num text-2xl font-medium text-text">
+                <div className="num text-2xl font-bold text-text">
                   {fmtNum(quality?.eventsReceived)}
                 </div>
               </Card>
               <Card padded className="space-y-1">
                 <div className="text-xs text-text-muted">{A ? "المرفوضة" : "Rejected"}</div>
-                <div className="num text-2xl font-medium text-text">
+                <div className="num text-2xl font-bold text-text">
                   {fmtNum(quality?.eventsRejected)}
                 </div>
               </Card>
@@ -642,7 +642,7 @@ function LandingPages() {
                 <div className="text-xs text-text-muted">
                   {A ? "تسليمات مكررة" : "Duplicate deliveries"}
                 </div>
-                <div className="num text-2xl font-medium text-text">
+                <div className="num text-2xl font-bold text-text">
                   {fmtNum(quality?.duplicateDeliveries)}
                 </div>
               </Card>
@@ -650,7 +650,7 @@ function LandingPages() {
                 <div className="text-xs text-text-muted">
                   {A ? "إرسال بلا مشاهدة سابقة" : "Submit without prior view"}
                 </div>
-                <div className="num text-2xl font-medium text-text">
+                <div className="num text-2xl font-bold text-text">
                   {fmtNum(quality?.submissionsWithoutPriorView)}
                 </div>
               </Card>
