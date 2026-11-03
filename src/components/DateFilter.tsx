@@ -125,7 +125,7 @@ function RangeDayButton({
         endpoint && "rounded-full bg-brand text-white font-semibold",
         // plain days
         !modifiers.selected && "rounded-lg text-text hover:bg-surface-2",
-        !modifiers.selected && modifiers.today && "font-bold text-brand",
+        !modifiers.selected && modifiers.today && "font-medium text-brand",
         !modifiers.selected && modifiers.outside && "text-text-subtle/50",
         modifiers.disabled && "cursor-not-allowed opacity-40 hover:bg-transparent",
       )}
@@ -247,7 +247,7 @@ export function DateRangePanel({
                 onApply?.();
               }}
               className={cn(
-                "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium transition-all cursor-pointer",
+                "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium transition-colors cursor-pointer",
                 p.full && "col-span-2",
                 on
                   ? "text-white shadow-sm"
@@ -286,7 +286,7 @@ export function DateRangePanel({
           </span>
         </button>
       ) : (
-        <div className="flex items-center gap-2 pt-1 text-[12px] font-medium uppercase tracking-wide text-text-subtle">
+        <div className="flex items-center gap-2 pt-1 text-[12px] font-medium text-text-subtle">
           <span className="h-px flex-1 bg-border" />
           {t("custom_range")}
           <span className="h-px flex-1 bg-border" />

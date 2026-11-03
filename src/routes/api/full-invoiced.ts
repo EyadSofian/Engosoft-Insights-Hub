@@ -18,13 +18,36 @@ export const Route = createFileRoute("/api/full-invoiced")({
 
         return json({
           totals: computeTotals(data),
-          byCampaign: groupBy(attributed, (r) => r.campaignName || "—", (r) => r.usdSales),
-          byCourse: groupBy(rows, (r) => r.course || "—", (r) => r.usdSales),
-          byTeam: groupBy(rows, (r) => r.salesTeam || "—", (r) => r.usdSales),
-          bySalesperson: groupBy(rows, (r) => r.salesperson || "—", (r) => r.usdSales),
-          bySource: groupBy(rows, (r) => labels.get(r.sourceKey) ?? r.source ?? "—", (r) => r.usdSales),
-          byMonth: groupBy(rows, (r) => (r.revenueDate ? r.revenueDate.slice(0, 7) : "—"), (r) => r.usdSales)
-            .sort((a, b) => a.label.localeCompare(b.label)),
+          byCampaign: groupBy(
+            attributed,
+            (r) => r.campaignName || "—",
+            (r) => r.usdSales,
+          ),
+          byCourse: groupBy(
+            rows,
+            (r) => r.course || "—",
+            (r) => r.usdSales,
+          ),
+          byTeam: groupBy(
+            rows,
+            (r) => r.salesTeam || "—",
+            (r) => r.usdSales,
+          ),
+          bySalesperson: groupBy(
+            rows,
+            (r) => r.salesperson || "—",
+            (r) => r.usdSales,
+          ),
+          bySource: groupBy(
+            rows,
+            (r) => labels.get(r.sourceKey) ?? r.source ?? "—",
+            (r) => r.usdSales,
+          ),
+          byMonth: groupBy(
+            rows,
+            (r) => (r.revenueDate ? r.revenueDate.slice(0, 7) : "—"),
+            (r) => r.usdSales,
+          ).sort((a, b) => a.label.localeCompare(b.label)),
           // Both sides of the attribution gap, with counts, so the missing 54%
           // of invoice lines stays visible instead of quietly vanishing.
           attribution: {

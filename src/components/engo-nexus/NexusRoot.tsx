@@ -1,7 +1,6 @@
 import { Suspense, useEffect, useRef, useState, type ComponentType } from "react";
 import { useAnyModalOpen } from "@/lib/ui-store";
 import { NEXUS_CLIENT_ID } from "./lib/nexus-config";
-import { NexusLauncher } from "./NexusLauncher";
 import { NexusProactivePopup } from "./NexusProactivePopup";
 import { nexusStore, useNexusUi } from "./state/nexus-store";
 import {
@@ -132,7 +131,6 @@ export function NexusRoot() {
 
   return (
     <>
-      <NexusLauncher hidden={open || anyModalOpen} />
       <NexusProactivePopup suppressed={open || anyModalOpen} />
       {Session ? (
         <Suspense fallback={open ? <PanelSkeleton /> : null}>

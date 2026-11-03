@@ -42,7 +42,7 @@ export function MoreReportsList({ onNavigate }: { onNavigate?: () => void }) {
             >
               <Icon size={16} className="shrink-0 opacity-80" aria-hidden="true" />
               <span className="min-w-0 leading-tight">
-                <span className="block truncate text-[13px] font-semibold">
+                <span className="block truncate text-[13px] font-medium">
                   {itemLabel(item, lang, t)}
                 </span>
                 {item.description && (

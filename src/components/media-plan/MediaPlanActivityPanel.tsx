@@ -75,7 +75,7 @@ export function MediaPlanActivityPanel({ month }: { month: string }) {
         <button
           type="button"
           onClick={() => refetch()}
-          className="mt-2 text-xs font-semibold underline"
+          className="mt-2 text-xs font-medium underline"
         >
           {lang === "ar" ? "حاول تاني" : "Retry"}
         </button>
@@ -98,7 +98,7 @@ export function MediaPlanActivityPanel({ month }: { month: string }) {
               type="button"
               onClick={() => refetch()}
               disabled={isFetching}
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-semibold text-brand disabled:opacity-50"
+              className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-medium text-brand disabled:opacity-50"
             >
               {isFetching ? (
                 <Loader2 size={14} className="animate-spin" />
@@ -154,7 +154,7 @@ export function MediaPlanActivityPanel({ month }: { month: string }) {
           <button
             type="button"
             onClick={() => setCourse("all")}
-            className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${course === "all" ? "bg-brand text-white" : "border border-border bg-surface text-text-muted"}`}
+            className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${course === "all" ? "bg-brand text-white" : "border border-border bg-surface text-text-muted"}`}
           >
             {lang === "ar" ? "كل الدورات" : "All courses"}
           </button>
@@ -163,7 +163,7 @@ export function MediaPlanActivityPanel({ month }: { month: string }) {
               key={row.key}
               type="button"
               onClick={() => setCourse(row.key)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${course === row.key ? "bg-brand text-white" : "border border-border bg-surface text-text-muted"}`}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${course === row.key ? "bg-brand text-white" : "border border-border bg-surface text-text-muted"}`}
             >
               {row.label} · {fmtNum(row.activeCampaigns)}
             </button>
@@ -172,7 +172,7 @@ export function MediaPlanActivityPanel({ month }: { month: string }) {
             <button
               type="button"
               onClick={() => setCourse("unlinked")}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold ${course === "unlinked" ? "bg-warning text-white" : "border border-warning/30 bg-warning-soft text-warning"}`}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-medium ${course === "unlinked" ? "bg-warning text-white" : "border border-warning/30 bg-warning-soft text-warning"}`}
             >
               {lang === "ar" ? "غير مربوطة" : "Unlinked"} · {fmtNum(data.unlinkedCount)}
             </button>
@@ -267,7 +267,7 @@ export function MediaPlanActivityPanel({ month }: { month: string }) {
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-bold text-text">{row.name}</div>
+                    <div className="truncate text-sm font-medium text-text">{row.name}</div>
                     <div className="mt-1 flex flex-wrap gap-1">
                       <Pill tone="neutral">{PLATFORM_LABEL[row.platform][lang]}</Pill>
                       <Pill tone={row.linked ? "brand" : "warning"}>
@@ -319,10 +319,10 @@ function PlatformCard({
       className={`rounded-2xl border p-3 text-start transition-colors ${selected ? "border-brand bg-brand-soft" : "border-border bg-surface-2/60 hover:border-brand/40"}`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs font-bold text-text">{PLATFORM_LABEL[platform][lang]}</span>
+        <span className="text-xs font-medium text-text">{PLATFORM_LABEL[platform][lang]}</span>
         <ShieldCheck size={15} className={health?.ok ? "text-success" : "text-warning"} />
       </div>
-      <div className="num mt-2 text-xl font-bold text-text">{fmtNum(health?.active ?? 0)}</div>
+      <div className="num mt-2 text-xl font-medium text-text">{fmtNum(health?.active ?? 0)}</div>
       <div className="mt-0.5 text-[12px] text-text-muted">
         {health?.ok
           ? lang === "ar"
@@ -353,7 +353,7 @@ function Mini({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-surface-2 p-2">
       <div className="text-[12px] text-text-subtle">{label}</div>
-      <div className="num mt-1 text-xs font-bold text-text">{value}</div>
+      <div className="num mt-1 text-xs font-medium text-text">{value}</div>
     </div>
   );
 }

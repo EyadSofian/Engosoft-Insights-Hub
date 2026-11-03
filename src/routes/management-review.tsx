@@ -134,8 +134,8 @@ function SummaryMetric({
   };
   return (
     <div className={`rounded-2xl border p-4 ${tones[tone]}`}>
-      <div className="text-xs font-semibold opacity-80">{label}</div>
-      <div className="num mt-2 text-2xl font-bold tracking-tight">{value}</div>
+      <div className="text-xs font-medium opacity-80">{label}</div>
+      <div className="num mt-2 text-2xl font-medium tracking-tight">{value}</div>
       <div className="mt-1 text-[12px] leading-relaxed opacity-75">{detail}</div>
     </div>
   );
@@ -188,7 +188,7 @@ function ManagementReviewPage() {
           period={`${row.month}-01 → ${row.month === data.today.slice(0, 7) ? data.today : new Date(Date.UTC(Number(row.month.slice(0, 4)), Number(row.month.slice(5, 7)), 0)).toISOString().slice(0, 10)}`}
         />
         <div className="flex flex-wrap items-end gap-2">
-          <label className="text-xs font-semibold text-text-muted">
+          <label className="text-xs font-medium text-text-muted">
             {ar ? "شهر المراجعة" : "Review month"}
             <select
               className="mt-1 block min-w-44 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text"
@@ -204,7 +204,7 @@ function ManagementReviewPage() {
           </label>
           <Link
             to="/media-plan"
-            className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-semibold text-brand"
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-medium text-brand"
           >
             <ArrowLeft size={14} />
             {ar ? "العودة لخطة الميديا" : "Media plan"}
@@ -214,10 +214,10 @@ function ManagementReviewPage() {
 
       <Card className="border-brand/20 bg-gradient-to-l from-brand/5 to-surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-bold text-text">
+          <h2 className="text-lg font-medium text-text">
             {ar ? "قرار الإدارة قبل خطة الشهر القادم" : "Management baseline for next month"}
           </h2>
-          <span className="rounded-full border border-border bg-surface px-3 py-1 text-[12px] font-semibold text-text-muted">
+          <span className="rounded-full border border-border bg-surface px-3 py-1 text-[12px] font-medium text-text-muted">
             {row.planStatus === "approved"
               ? ar
                 ? "خطة معتمدة"
@@ -289,7 +289,7 @@ function ManagementReviewPage() {
         <Card className="p-5">
           <div className="mb-4 flex items-center gap-2">
             <Target size={18} className="text-brand" />
-            <h2 className="text-base font-bold text-text">
+            <h2 className="text-base font-medium text-text">
               {ar ? "الخطة مقابل الفعلي" : "Target vs actual"}
             </h2>
           </div>
@@ -332,7 +332,7 @@ function ManagementReviewPage() {
         <Card className="p-5">
           <div className="mb-4 flex items-center gap-2">
             <CircleHelp size={18} className="text-brand" />
-            <h2 className="text-base font-bold text-text">
+            <h2 className="text-base font-medium text-text">
               {ar ? "أين تضيع الليدز؟" : "Where do leads drop?"}
             </h2>
           </div>
@@ -400,7 +400,7 @@ function ManagementReviewPage() {
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <Card className="p-5">
-          <h2 className="mb-3 text-base font-bold text-text">
+          <h2 className="mb-3 text-base font-medium text-text">
             {ar ? "أسباب الـLost" : "Lost reasons"}
           </h2>
           {f.reasons.length ? (
@@ -435,7 +435,7 @@ function ManagementReviewPage() {
           )}
         </Card>
         <Card className="p-5">
-          <h2 className="mb-1 text-base font-bold text-text">
+          <h2 className="mb-1 text-base font-medium text-text">
             {ar ? "أي دورة تحول أفضل؟" : "Which courses convert best?"}
           </h2>
           <p className="mb-3 text-[12px] text-text-muted">
@@ -494,7 +494,7 @@ function ManagementReviewPage() {
       <Card className="p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <h2 className="text-base font-bold text-text">
+            <h2 className="text-base font-medium text-text">
               {ar ? "مسار الشهور · 2025 حتى الآن" : "Monthly trend · 2025 to date"}
             </h2>
             <p className="text-xs text-text-muted">

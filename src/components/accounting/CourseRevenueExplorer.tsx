@@ -112,12 +112,20 @@ function CourseCrmCostPanel() {
 
       {isLoading && !data ? (
         <p className="py-6 text-sm text-text-muted">
-          {lang === "ar" ? "جارٍ حساب تكلفة الليد لكل كورس..." : "Calculating each course's lead cost..."}
+          {lang === "ar"
+            ? "جارٍ حساب تكلفة الليد لكل كورس..."
+            : "Calculating each course's lead cost..."}
         </p>
       ) : error ? (
         <div className="flex flex-wrap items-center gap-3 py-4 text-sm text-text-muted">
-          <span>{lang === "ar" ? "تعذّر تحميل تكلفة الليد." : "Could not load course lead costs."}</span>
-          <button type="button" onClick={() => void refetch()} className="font-bold text-brand underline">
+          <span>
+            {lang === "ar" ? "تعذّر تحميل تكلفة الليد." : "Could not load course lead costs."}
+          </span>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="font-medium text-brand underline"
+          >
             {lang === "ar" ? "إعادة المحاولة" : "Retry"}
           </button>
         </div>
@@ -132,22 +140,35 @@ function CourseCrmCostPanel() {
                   className="overflow-hidden rounded-2xl border border-border bg-surface-2/35 p-3.5"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <h3 className="min-w-0 truncate text-sm font-bold text-text" title={course.name}>
+                    <h3
+                      className="min-w-0 truncate text-sm font-medium text-text"
+                      title={course.name}
+                    >
                       {course.name}
                     </h3>
-                    <span className="num shrink-0 rounded-lg bg-brand-soft px-2.5 py-1 text-base font-bold text-brand">
+                    <span className="num shrink-0 rounded-lg bg-brand-soft px-2.5 py-1 text-base font-medium text-brand">
                       {fmtUSDFull(cpl)}
                     </span>
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-2 border-t border-border/70 pt-2 text-[12px] text-text-muted">
-                    <span>{lang === "ar" ? "الصرف المنسوب" : "Attributed spend"} <b className="num text-text">{fmtUSDFull(course.spend)}</b></span>
-                    <span>{lang === "ar" ? "ليدز CRM" : "CRM leads"} <b className="num text-text">{fmtNum(course.crmLeads)}</b></span>
+                    <span>
+                      {lang === "ar" ? "الصرف المنسوب" : "Attributed spend"}{" "}
+                      <b className="num text-text">{fmtUSDFull(course.spend)}</b>
+                    </span>
+                    <span>
+                      {lang === "ar" ? "ليدز CRM" : "CRM leads"}{" "}
+                      <b className="num text-text">{fmtNum(course.crmLeads)}</b>
+                    </span>
                   </div>
                   {cpl === null && (
                     <p className="mt-1.5 text-[11px] text-text-subtle">
                       {lang === "ar"
-                        ? course.spend <= 0 ? "لا يوجد صرف منسوب؛ لا نعرض تكلفة صفرية." : "لا توجد ليدز CRM محسوبة؛ التكلفة غير قابلة للحساب."
-                        : course.spend <= 0 ? "No attributed spend; a zero cost is not assumed." : "No counted CRM leads; cost is not measurable."}
+                        ? course.spend <= 0
+                          ? "لا يوجد صرف منسوب؛ لا نعرض تكلفة صفرية."
+                          : "لا توجد ليدز CRM محسوبة؛ التكلفة غير قابلة للحساب."
+                        : course.spend <= 0
+                          ? "No attributed spend; a zero cost is not assumed."
+                          : "No counted CRM leads; cost is not measurable."}
                     </p>
                   )}
                 </article>
@@ -158,18 +179,24 @@ function CourseCrmCostPanel() {
             <button
               type="button"
               onClick={() => setShowAll((value) => !value)}
-              className="mt-3 min-h-10 rounded-xl border border-border px-3 text-xs font-bold text-brand hover:bg-brand-soft"
+              className="mt-3 min-h-10 rounded-xl border border-border px-3 text-xs font-medium text-brand hover:bg-brand-soft"
               aria-expanded={showAll}
             >
               {showAll
-                ? lang === "ar" ? "عرض أقل" : "Show fewer"
-                : lang === "ar" ? `عرض كل الكورسات (${fmtNum(courses.length)})` : `Show all courses (${fmtNum(courses.length)})`}
+                ? lang === "ar"
+                  ? "عرض أقل"
+                  : "Show fewer"
+                : lang === "ar"
+                  ? `عرض كل الكورسات (${fmtNum(courses.length)})`
+                  : `Show all courses (${fmtNum(courses.length)})`}
             </button>
           )}
         </>
       ) : (
         <p className="py-6 text-sm text-text-muted">
-          {lang === "ar" ? "لا توجد بيانات كورسات في الفترة المختارة." : "No course data in the selected period."}
+          {lang === "ar"
+            ? "لا توجد بيانات كورسات في الفترة المختارة."
+            : "No course data in the selected period."}
         </p>
       )}
     </Card>
@@ -214,20 +241,20 @@ export function CourseRevenueExplorer({ data }: { data: AccountingCourses }) {
               key={row.familyKey}
               type="button"
               onClick={() => setOpen(row)}
-              className="group relative min-h-32 overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-surface to-surface-2/45 p-4 text-start shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              className="group relative min-h-32 overflow-hidden rounded-2xl border border-border bg-gradient-to-br from-surface to-surface-2/45 p-4 text-start shadow-sm transition-colors duration-200 hover:-translate-y-0.5 hover:border-brand/35 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               aria-label={`${row.family} — ${fmtUSDFull(row.revenueUsd)}`}
             >
               <div className="flex items-start gap-3">
-                <span className="num mt-0.5 w-6 shrink-0 text-[12px] font-semibold text-text-subtle">
+                <span className="num mt-0.5 w-6 shrink-0 text-[12px] font-medium text-text-subtle">
                   {index + 1}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="mb-1 text-[12px] font-semibold uppercase tracking-[0.16em] text-brand/75">
+                      <p className="mb-1 text-[12px] font-medium text-brand/75">
                         {lang === "ar" ? "Product Category" : "Product category"}
                       </p>
-                      <p className="truncate text-[15px] font-bold text-text">{row.family}</p>
+                      <p className="truncate text-[15px] font-medium text-text">{row.family}</p>
                       <p className="mt-1 truncate text-[12px] text-text-subtle">
                         {fmtNum(row.products.length)} {lang === "ar" ? "منتج" : "products"}
                       </p>
@@ -579,7 +606,7 @@ function EventRows({
             <span className="min-w-0 truncate text-[13px] font-medium text-text" title={row.label}>
               {row.label}
             </span>
-            <span className="num shrink-0 text-[12px] font-semibold text-text">
+            <span className="num shrink-0 text-[12px] font-medium text-text">
               {fmtUSDFull(row.revenueUsd)} · {fmtNum(row.invoices)}
             </span>
           </span>

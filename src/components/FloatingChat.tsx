@@ -115,7 +115,7 @@ export function FloatingChat() {
         onClick={() => setOpen((o) => !o)}
         aria-label={t("ai_assistant")}
         aria-expanded={open}
-        className={`fixed z-40 bottom-5 end-5 hidden h-12 w-12 place-items-center rounded-full text-white cursor-pointer transition-all duration-300 lg:grid ${
+        className={`fixed z-40 bottom-5 end-5 hidden h-12 w-12 place-items-center rounded-full text-white cursor-pointer transition-colors duration-300 lg:grid ${
           open || anyModalOpen ? "scale-0 opacity-0 pointer-events-none" : "scale-100 opacity-100"
         }`}
         style={{

@@ -914,7 +914,7 @@ function CrmWorkspace() {
                   type="button"
                   onClick={() => selectView(tab.key)}
                   aria-pressed={view === tab.key}
-                  className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-[12px] font-bold transition-all ${view === tab.key ? "bg-text text-surface shadow-sm" : "text-text-muted hover:bg-surface hover:text-text"}`}
+                  className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-xl px-3 text-[12px] font-medium transition-colors ${view === tab.key ? "bg-text text-surface shadow-sm" : "text-text-muted hover:bg-surface hover:text-text"}`}
                 >
                   {tab.icon}
                   {tab.label}
@@ -938,7 +938,7 @@ function CrmWorkspace() {
                     type="button"
                     onClick={() => selectStage(key)}
                     aria-pressed={selected}
-                    className={`group relative min-h-[116px] border-y border-s-0 bg-surface px-3 py-3 text-start transition-all first:rounded-s-2xl first:border-s last:rounded-e-2xl ${selected ? "z-10 -translate-y-1 border-border-strong shadow-md" : "border-border hover:-translate-y-0.5 hover:bg-surface-2"}`}
+                    className={`group relative min-h-[116px] border-y border-s-0 bg-surface px-3 py-3 text-start transition-colors first:rounded-s-2xl first:border-s last:rounded-e-2xl ${selected ? "z-10 -translate-y-1 border-border-strong shadow-md" : "border-border hover:-translate-y-0.5 hover:bg-surface-2"}`}
                     style={{
                       borderTopColor: selected ? STAGE_COLOR[key] : undefined,
                       borderTopWidth: selected ? 3 : 1,
@@ -953,8 +953,8 @@ function CrmWorkspace() {
                     >
                       {stageIcon(key)}
                     </span>
-                    <span className="block text-[12px] font-bold text-text">{copy.name}</span>
-                    <span className="num mt-1 block text-[25px] font-bold leading-none text-text">
+                    <span className="block text-[12px] font-medium text-text">{copy.name}</span>
+                    <span className="num mt-1 block text-[25px] font-medium leading-none text-text">
                       {fmtNum(value?.count ?? 0)}
                     </span>
                     <span className="mt-2 block text-[12px] text-text-muted">
@@ -1003,7 +1003,7 @@ function CrmWorkspace() {
                   setView("all");
                   setStage(null);
                 }}
-                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[12px] font-bold text-text-muted hover:text-text"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[12px] font-medium text-text-muted hover:text-text"
               >
                 <Filter size={12} /> {A ? "مسح التحديد" : "Clear selection"}
               </button>
@@ -1054,7 +1054,7 @@ function CrmWorkspace() {
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="text-[17px] font-bold text-text">
+                      <h2 className="text-[17px] font-medium text-text">
                         {selectedStage?.name ??
                           (A ? "تعريف Lost في 1.26" : "Lost definition in 1.26")}
                       </h2>
@@ -1072,7 +1072,7 @@ function CrmWorkspace() {
                       {(selectedStage?.fields ?? stageCopy("lost", lang).fields).map((field) => (
                         <span
                           key={field}
-                          className="rounded-lg border border-border bg-surface/80 px-2 py-1 text-[12px] font-semibold text-text-muted"
+                          className="rounded-lg border border-border bg-surface/80 px-2 py-1 text-[12px] font-medium text-text-muted"
                         >
                           {field}
                         </span>
@@ -1134,7 +1134,7 @@ function CrmWorkspace() {
           </span>
           <Link
             to="/lost"
-            className="inline-flex items-center gap-1 font-bold text-brand hover:underline"
+            className="inline-flex items-center gap-1 font-medium text-brand hover:underline"
           >
             {A ? "فتح تحليل Lost المتقدم" : "Open advanced Lost analysis"}
             {A ? <ArrowLeft size={13} /> : <ChevronLeft className="rotate-180" size={13} />}
@@ -1175,17 +1175,17 @@ function CrmStageSla({ summary, lang }: { summary: SlaSummary; lang: "ar" | "en"
           <div className="text-[12px] text-text-muted">
             {A ? "في مراحل الـSLA" : "In SLA stages"}
           </div>
-          <div className="num text-xl font-bold text-text">{fmtNum(summary.total)}</div>
+          <div className="num text-xl font-medium text-text">{fmtNum(summary.total)}</div>
         </div>
         <div className="rounded-xl border border-danger/20 bg-danger/5 px-3 py-2.5">
           <div className="text-[12px] text-danger">{A ? "متجاوزة للـSLA" : "Over SLA"}</div>
-          <div className="num text-xl font-bold text-danger">{fmtNum(summary.overdue)}</div>
+          <div className="num text-xl font-medium text-danger">{fmtNum(summary.overdue)}</div>
         </div>
         <div className="rounded-xl bg-surface px-3 py-2.5">
           <div className="text-[12px] text-text-muted">
             {A ? "وقت المرحلة غير متاح" : "Stage time unavailable"}
           </div>
-          <div className="num text-xl font-bold text-text">{fmtNum(summary.unknown)}</div>
+          <div className="num text-xl font-medium text-text">{fmtNum(summary.unknown)}</div>
         </div>
       </div>
       <p className="border-b border-border px-4 py-2.5 text-[12px] leading-5 text-text-muted">
@@ -1199,11 +1199,11 @@ function CrmStageSla({ summary, lang }: { summary: SlaSummary; lang: "ar" | "en"
         <table className="w-full min-w-[850px] table-fixed text-start text-[12px]">
           <thead className="bg-surface-2 text-text-muted">
             <tr>
-              <th scope="col" className="w-[24%] px-4 py-3 text-start font-bold">
+              <th scope="col" className="w-[24%] px-4 py-3 text-start font-medium">
                 {A ? "الموظف" : "Employee"}
               </th>
               {SLA_STAGES.map((stage) => (
-                <th key={stage} scope="col" className="w-[16%] px-2 py-3 text-center font-bold">
+                <th key={stage} scope="col" className="w-[16%] px-2 py-3 text-center font-medium">
                   <span className="block">{stageLabels[stage]}</span>
                   <span className="block text-[12px] font-normal text-text-subtle">
                     {stage === "new"
@@ -1214,7 +1214,7 @@ function CrmStageSla({ summary, lang }: { summary: SlaSummary; lang: "ar" | "en"
                   </span>
                 </th>
               ))}
-              <th scope="col" className="w-[12%] px-3 py-3 text-center font-bold">
+              <th scope="col" className="w-[12%] px-3 py-3 text-center font-medium">
                 {A ? "الإجمالي / المتجاوز" : "Total / overdue"}
               </th>
             </tr>
@@ -1243,9 +1243,9 @@ function CrmStageSla({ summary, lang }: { summary: SlaSummary; lang: "ar" | "en"
                           aria-pressed={active}
                           className={`inline-flex min-w-20 flex-col rounded-xl border px-2 py-1.5 transition ${active ? "border-brand bg-brand/10" : "border-transparent hover:border-border hover:bg-surface-2"}`}
                         >
-                          <span className="num font-bold text-text">{fmtNum(cell.count)}</span>
+                          <span className="num font-medium text-text">{fmtNum(cell.count)}</span>
                           <span
-                            className={`num text-[12px] ${cell.overdue ? "font-bold text-danger" : "text-text-muted"}`}
+                            className={`num text-[12px] ${cell.overdue ? "font-medium text-danger" : "text-text-muted"}`}
                           >
                             {fmtNum(cell.overdue)} {A ? "متجاوز" : "overdue"}
                           </span>
@@ -1261,7 +1261,7 @@ function CrmStageSla({ summary, lang }: { summary: SlaSummary; lang: "ar" | "en"
                     </td>
                   );
                 })}
-                <td className="num px-3 py-3 text-center font-bold text-text">
+                <td className="num px-3 py-3 text-center font-medium text-text">
                   {fmtNum(employee.total)} /{" "}
                   <span className={employee.overdue ? "text-danger" : "text-text-muted"}>
                     {fmtNum(employee.overdue)}
@@ -1282,13 +1282,13 @@ function CrmStageSla({ summary, lang }: { summary: SlaSummary; lang: "ar" | "en"
       {selected && selectedCell && (
         <div className="border-t border-border bg-surface-2/50 p-3 sm:p-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-sm font-bold text-text">
+            <h3 className="text-sm font-medium text-text">
               {selected.employee} · {stageLabels[selected.stage]} · {fmtNum(selectedCell.count)}
             </h3>
             <button
               type="button"
               onClick={() => setSelected(null)}
-              className="text-xs font-semibold text-brand hover:underline"
+              className="text-xs font-medium text-brand hover:underline"
             >
               {A ? "إغلاق" : "Close"}
             </button>
@@ -1317,7 +1317,7 @@ function CrmStageSla({ summary, lang }: { summary: SlaSummary; lang: "ar" | "en"
                   {A ? "الموعد" : "Due"}: {time(row.dueAt)}
                 </span>
                 <span
-                  className={`shrink-0 font-bold ${row.overdue === true ? "text-danger" : row.overdue === null ? "text-amber-strong" : "text-mint-strong"}`}
+                  className={`shrink-0 font-medium ${row.overdue === true ? "text-danger" : row.overdue === null ? "text-amber-strong" : "text-mint-strong"}`}
                 >
                   {row.overdue === true
                     ? A
@@ -1348,8 +1348,8 @@ function CrmStageSla({ summary, lang }: { summary: SlaSummary; lang: "ar" | "en"
 function MiniStat({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded-xl border border-border bg-surface/85 px-3 py-2">
-      <div className="text-[12px] font-semibold text-text-muted">{label}</div>
-      <div className="num mt-1 text-lg font-bold text-text">{fmtNum(value)}</div>
+      <div className="text-[12px] font-medium text-text-muted">{label}</div>
+      <div className="num mt-1 text-lg font-medium text-text">{fmtNum(value)}</div>
     </div>
   );
 }
@@ -1415,7 +1415,7 @@ function FacetCard({
   return (
     <Card>
       <div className="mb-4 flex items-center justify-between gap-2">
-        <h3 className="text-[13px] font-bold text-text">{title}</h3>
+        <h3 className="text-[13px] font-medium text-text">{title}</h3>
         <span className="size-2 rounded-full" style={{ background: color }} />
       </div>
       <BarList

@@ -23,10 +23,7 @@ export const EMPLOYEE_SCORE_RULES = {
 } as const;
 
 export type EmployeeScoreComponent =
-  | "callQuality"
-  | "salesExecution"
-  | "chatFollowUp"
-  | "targetAttainment";
+  "callQuality" | "salesExecution" | "chatFollowUp" | "targetAttainment";
 
 export interface EmployeePerformanceScoreInput {
   averageQualityScore: number | null;
@@ -108,24 +105,20 @@ export function calculateEmployeePerformanceScore(
           (callAnalysisCoverageRate ?? 0) / 100,
         );
   const callEffectiveWeight = EMPLOYEE_SCORE_WEIGHTS.callQuality * callEvidenceFactor;
-  const callPoints = (callQuality ?? 0) * callEffectiveWeight / 100;
+  const callPoints = ((callQuality ?? 0) * callEffectiveWeight) / 100;
 
   const distributedLeads = Math.max(0, input.distributedLeads);
   const ownerCalledDistributedLeads =
-    input.ownerCalledDistributedLeads !== null &&
-    Number.isFinite(input.ownerCalledDistributedLeads)
+    input.ownerCalledDistributedLeads !== null && Number.isFinite(input.ownerCalledDistributedLeads)
       ? Math.max(0, input.ownerCalledDistributedLeads)
       : null;
   const leadCoverageRate =
     distributedLeads > 0 ? finitePercent(input.leadOwnerCallCoverageRate) : null;
-  const leadConversionRate =
-    input.cleanLeads > 0 ? finitePercent(input.conversionRate) : null;
+  const leadConversionRate = input.cleanLeads > 0 ? finitePercent(input.conversionRate) : null;
   const normalizedConversionScore =
     leadConversionRate === null
       ? null
-      : clampPercent(
-          (leadConversionRate / EMPLOYEE_SCORE_RULES.conversionBenchmarkPercent) * 100,
-        );
+      : clampPercent((leadConversionRate / EMPLOYEE_SCORE_RULES.conversionBenchmarkPercent) * 100);
   const leadSampleFactor = Math.min(
     1,
     Math.max(0, input.cleanLeads) / EMPLOYEE_SCORE_RULES.minimumLeadSample,
@@ -133,8 +126,7 @@ export function calculateEmployeePerformanceScore(
   const coverageWeight =
     leadCoverageRate === null
       ? 0
-      : EMPLOYEE_SCORE_WEIGHTS.salesExecution *
-        (EMPLOYEE_SCORE_RULES.leadCoverageShare / 100);
+      : EMPLOYEE_SCORE_WEIGHTS.salesExecution * (EMPLOYEE_SCORE_RULES.leadCoverageShare / 100);
   const conversionWeight =
     normalizedConversionScore === null
       ? 0
@@ -142,8 +134,8 @@ export function calculateEmployeePerformanceScore(
         (EMPLOYEE_SCORE_RULES.leadConversionShare / 100) *
         leadSampleFactor;
   const salesPoints =
-    (leadCoverageRate ?? 0) * coverageWeight / 100 +
-    (normalizedConversionScore ?? 0) * conversionWeight / 100;
+    ((leadCoverageRate ?? 0) * coverageWeight) / 100 +
+    ((normalizedConversionScore ?? 0) * conversionWeight) / 100;
   // This is the conservative contribution expressed on a 0..100 component
   // scale. A missing sub-metric or tiny conversion sample remains visible as
   // unearned evidence instead of being redistributed to the other sub-metric.
@@ -167,27 +159,21 @@ export function calculateEmployeePerformanceScore(
     availableChatShare === 0
       ? null
       : clampPercent(
-          ((replyEvidenceAvailable
+          (((replyEvidenceAvailable
             ? EMPLOYEE_SCORE_RULES.chatReplyShare * (repliedConversations / conversations)
             : 0) +
             (readEvidenceAvailable
-              ? EMPLOYEE_SCORE_RULES.chatReadShare *
-                (1 - Math.min(1, unread / conversations))
+              ? EMPLOYEE_SCORE_RULES.chatReadShare * (1 - Math.min(1, unread / conversations))
               : 0)) /
-            availableChatShare *
+            availableChatShare) *
             100,
         );
-  const chatSampleFactor = Math.min(
-    1,
-    conversations / EMPLOYEE_SCORE_RULES.minimumChatSample,
-  );
+  const chatSampleFactor = Math.min(1, conversations / EMPLOYEE_SCORE_RULES.minimumChatSample);
   const chatEffectiveWeight =
     chatFollowUp === null
       ? 0
-      : EMPLOYEE_SCORE_WEIGHTS.chatFollowUp *
-        chatSampleFactor *
-        (availableChatShare / 100);
-  const chatPoints = (chatFollowUp ?? 0) * chatEffectiveWeight / 100;
+      : EMPLOYEE_SCORE_WEIGHTS.chatFollowUp * chatSampleFactor * (availableChatShare / 100);
+  const chatPoints = ((chatFollowUp ?? 0) * chatEffectiveWeight) / 100;
 
   // Confirmed sale orders measure what the employee sold inside the selected
   // window. Collections are a documented fallback because payment can arrive
@@ -199,9 +185,9 @@ export function calculateEmployeePerformanceScore(
   const targetBasis = !input.targetComplete
     ? null
     : orderAchievement !== null
-      ? "orders" as const
+      ? ("orders" as const)
       : paidAchievement !== null
-        ? "collections" as const
+        ? ("collections" as const)
         : null;
   const targetAttainment =
     targetBasis === "orders"
@@ -211,7 +197,7 @@ export function calculateEmployeePerformanceScore(
         : null;
   const targetEffectiveWeight =
     targetAttainment === null ? 0 : EMPLOYEE_SCORE_WEIGHTS.targetAttainment;
-  const targetPoints = (targetAttainment ?? 0) * targetEffectiveWeight / 100;
+  const targetPoints = ((targetAttainment ?? 0) * targetEffectiveWeight) / 100;
 
   const earnedPoints = {
     callQuality: rounded(callPoints),

@@ -28,11 +28,11 @@ function Section({
       className="scroll-mt-28 overflow-hidden rounded-[26px] border border-border bg-surface shadow-sm"
     >
       <div className="flex gap-4 border-b border-border bg-surface-2/60 px-5 py-5 sm:px-7">
-        <span className="num flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-strong text-xs font-black text-white">
+        <span className="num flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sky-strong text-xs font-medium text-white">
           {index}
         </span>
         <div>
-          <h3 className="text-lg font-bold text-text">{title}</h3>
+          <h3 className="text-lg font-medium text-text">{title}</h3>
           <p className="mt-1 text-xs leading-relaxed text-text-muted">{description}</p>
         </div>
       </div>
@@ -60,8 +60,8 @@ function Metric({
   };
   return (
     <div className={`rounded-2xl p-4 ${colors[color]}`}>
-      <p className="text-xs font-semibold opacity-85">{label}</p>
-      <p className="num mt-2 text-2xl font-black">{value}</p>
+      <p className="text-xs font-medium opacity-85">{label}</p>
+      <p className="num mt-2 text-2xl font-medium">{value}</p>
       {detail && <p className="mt-1 text-[12px] leading-relaxed opacity-80">{detail}</p>}
     </div>
   );
@@ -70,7 +70,7 @@ function Metric({
 function Expand({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <details className="group rounded-2xl border border-border bg-surface-2/40">
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-bold text-sky-strong">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-sky-strong">
         {label}
         <ChevronDown size={16} className="transition group-open:rotate-180" />
       </summary>
@@ -92,7 +92,7 @@ function CourseSourceDetails({
 }) {
   return (
     <details className="group mt-4 rounded-xl border border-border bg-surface-2/50 open:bg-surface">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-bold text-sky-strong marker:hidden">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-medium text-sky-strong marker:hidden">
         <span>
           {arabic ? `مصادر ليدز ${course} والحملات` : `${course} lead sources and campaigns`}
         </span>
@@ -128,7 +128,7 @@ function CourseSourceDetails({
               >
                 <summary className="cursor-pointer list-none p-3 marker:hidden hover:bg-sky-surface/40">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="flex min-w-0 items-center gap-2 text-xs font-bold text-text">
+                    <span className="flex min-w-0 items-center gap-2 text-xs font-medium text-text">
                       <ChevronDown
                         size={14}
                         className="shrink-0 text-sky-strong transition-transform group-open/source:rotate-180"
@@ -139,7 +139,7 @@ function CourseSourceDetails({
                           : source.source}
                       </span>
                     </span>
-                    <span className="num shrink-0 text-xs font-black text-text">
+                    <span className="num shrink-0 text-xs font-medium text-text">
                       {fmtNum(source.leads)}{" "}
                       <span className="text-sky-strong">· {pct(source.share)}</span>
                     </span>
@@ -156,7 +156,7 @@ function CourseSourceDetails({
                   </p>
                 </summary>
                 <div className="space-y-2 border-t border-border bg-surface-2/40 p-3">
-                  <p className="text-[12px] font-semibold text-text-muted">
+                  <p className="text-[12px] font-medium text-text-muted">
                     {arabic ? "حملات المصدر" : "Source campaigns"} ·{" "}
                     {fmtNum(source.campaigns.length)}
                   </p>
@@ -167,14 +167,14 @@ function CourseSourceDetails({
                     >
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <span
-                          className="min-w-0 break-words text-xs font-bold text-text"
+                          className="min-w-0 break-words text-xs font-medium text-text"
                           title={campaign.name || undefined}
                         >
                           {campaign.name ||
                             (arabic ? "حملة غير محددة في Odoo" : "Campaign not recorded in Odoo")}
                         </span>
                         {campaign === bestCampaign && (
-                          <span className="rounded-full bg-mint-surface px-2 py-0.5 text-[12px] font-bold text-mint-strong">
+                          <span className="rounded-full bg-mint-surface px-2 py-0.5 text-[12px] font-medium text-mint-strong">
                             {arabic ? "الأعلى في Won" : "Most Won"}
                           </span>
                         )}
@@ -218,7 +218,7 @@ function OutcomeStrip({
 }) {
   return (
     <div className="mt-4 border-t border-border pt-3">
-      <p className="mb-2 text-[12px] font-semibold text-text-muted">
+      <p className="mb-2 text-[12px] font-medium text-text-muted">
         {arabic ? "مصير نفس الليدز الواردة" : "Outcome of these same leads"}
       </p>
       <div className="grid grid-cols-3 gap-1.5 text-center">
@@ -232,13 +232,13 @@ function OutcomeStrip({
           { label: arabic ? "مفتوح" : "Open", count: open, style: "bg-surface-2 text-text-muted" },
         ].map((item) => (
           <div key={item.label} className={`rounded-xl px-1.5 py-2 ${item.style}`}>
-            <p className="text-[12px] font-bold">{item.label}</p>
-            <p className="num mt-0.5 text-sm font-black">
+            <p className="text-[12px] font-medium">{item.label}</p>
+            <p className="num mt-0.5 text-sm font-medium">
               {!lostAvailable && item.label !== (arabic ? "ناجح" : "Won")
                 ? "—"
                 : fmtNum(item.count)}
             </p>
-            <p className="num text-[12px] font-bold">
+            <p className="num text-[12px] font-medium">
               {!lostAvailable && item.label !== (arabic ? "ناجح" : "Won")
                 ? "—"
                 : pct(total ? item.count / total : null)}
@@ -277,7 +277,7 @@ function CohortAnalysis({
   return (
     <div className="space-y-5">
       {!lostAvailable && (
-        <div className="rounded-xl border border-amber-strong/30 bg-amber-surface px-4 py-3 text-xs font-bold text-amber-strong">
+        <div className="rounded-xl border border-amber-strong/30 bg-amber-surface px-4 py-3 text-xs font-medium text-amber-strong">
           {arabic
             ? "مصدر المفقود في Odoo غير متاح حاليًا. أعداد ونِسَب الخسارة والمعيار التاريخي غير قابلة للاعتماد حتى تكتمل المزامنة."
             : "Odoo Lost source is unavailable. Loss counts, rates and the historical benchmark are not reliable until sync recovers."}
@@ -285,7 +285,7 @@ function CohortAnalysis({
       )}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-sky-strong/20 bg-sky-surface/50 p-4">
         <div>
-          <p className="text-sm font-black text-text">
+          <p className="text-sm font-medium text-text">
             {arabic
               ? "تابع نفس مجموعة الليدز من يوم دخولها"
               : "Follow the same lead cohort from creation"}
@@ -296,10 +296,10 @@ function CohortAnalysis({
               : "Month 1 = days 0–29; Month 2 = days 30–59. Final rates include only leads that completed the full window; observed-to-date counts are separate."}
           </p>
         </div>
-        <label className="text-xs font-bold text-text-muted">
+        <label className="text-xs font-medium text-text-muted">
           {arabic ? "الدورة" : "Course"}
           <select
-            className="ms-2 min-h-10 rounded-xl border border-border bg-surface px-3 text-sm font-bold text-text"
+            className="ms-2 min-h-10 rounded-xl border border-border bg-surface px-3 text-sm font-medium text-text"
             value={selected.course}
             onChange={(event) => onCourseChange(event.target.value)}
           >
@@ -342,7 +342,7 @@ function CohortAnalysis({
             >
               <div className="flex items-center justify-between gap-2 border-b border-border bg-surface-2/60 px-4 py-3">
                 <div>
-                  <p className="text-sm font-black text-text">
+                  <p className="text-sm font-medium text-text">
                     {arabic
                       ? `الشهر ${index + 1 === 1 ? "الأول" : "الثاني"}`
                       : `Month ${index + 1}`}
@@ -353,7 +353,7 @@ function CohortAnalysis({
                   </p>
                 </div>
                 <span
-                  className={`rounded-full px-2 py-1 text-[12px] font-bold ${complete ? "bg-mint-surface text-mint-strong" : "bg-amber-surface text-amber-strong"}`}
+                  className={`rounded-full px-2 py-1 text-[12px] font-medium ${complete ? "bg-mint-surface text-mint-strong" : "bg-amber-surface text-amber-strong"}`}
                 >
                   {complete ? (arabic ? "مكتمل" : "Complete") : arabic ? "جزئي" : "Partial"}
                 </span>
@@ -388,13 +388,13 @@ function CohortAnalysis({
                   ].map((item) => (
                     <div key={item.label} className="rounded-xl bg-surface-2 px-2 py-3">
                       <p className="text-[12px] text-text-muted">{item.label}</p>
-                      <p className={`num mt-1 text-xl font-black ${item.color}`}>
+                      <p className={`num mt-1 text-xl font-medium ${item.color}`}>
                         {!lostAvailable &&
                         item.label !== (arabic ? "ناجح تراكمي" : "Cumulative won")
                           ? "—"
                           : fmtNum(item.count)}
                       </p>
-                      <p className="num text-[12px] font-bold text-text-muted">
+                      <p className="num text-[12px] font-medium text-text-muted">
                         {!lostAvailable &&
                         item.label !== (arabic ? "ناجح تراكمي" : "Cumulative won")
                           ? "—"
@@ -424,7 +424,7 @@ function CohortAnalysis({
       <div className="rounded-2xl border border-border p-4 sm:p-5">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h4 className="text-sm font-black text-text">
+            <h4 className="text-sm font-medium text-text">
               {arabic
                 ? "مقارنة الخسارة عبر آخر 12 شهر إنشاء"
                 : "Lost rate by creation month · last 12 months"}
@@ -469,7 +469,7 @@ function CohortAnalysis({
                   }}
                 />
               </div>
-              <p className="num mt-1 text-[12px] font-bold text-text">{month.month.slice(5)}</p>
+              <p className="num mt-1 text-[12px] font-medium text-text">{month.month.slice(5)}</p>
               <p className="num text-[12px] text-text-muted">
                 {lostAvailable ? pct(month.lostRate60) : "—"}
               </p>
@@ -477,7 +477,7 @@ function CohortAnalysis({
           ))}
         </div>
         <details className="mt-4 rounded-xl border border-border">
-          <summary className="cursor-pointer px-3 py-2 text-xs font-bold text-sky-strong">
+          <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-sky-strong">
             {arabic ? "اعرض أعداد كل شهر بالتفصيل" : "Show each month's counts"}
           </summary>
           <div className="overflow-x-auto border-t border-border p-3">
@@ -513,7 +513,7 @@ function CohortAnalysis({
         </details>
       </div>
       <div className="rounded-2xl border border-border p-4 sm:p-5">
-        <h4 className="text-sm font-black text-text">
+        <h4 className="text-sm font-medium text-text">
           {arabic ? "أسباب المفقود من نفس الليدز" : "Lost reasons in this cohort"}
         </h4>
         <p className="mt-1 text-xs text-text-muted">
@@ -599,10 +599,8 @@ export function LeadIntelligence() {
         <div className="relative">
           <div className="flex flex-wrap items-start justify-between gap-5">
             <div className="max-w-2xl">
-              <p className="text-[12px] font-black tracking-[0.2em] text-sky-200">
-                ENGOSOFT / LEAD INTELLIGENCE
-              </p>
-              <h2 className="mt-3 text-2xl font-black sm:text-3xl">
+              <p className="text-[12px] font-medium text-sky-200">ENGOSOFT / LEAD INTELLIGENCE</p>
+              <h2 className="mt-3 text-2xl font-medium sm:text-3xl">
                 {A ? "من الليد إلى قرار توزيع الكورس" : "From lead to course allocation"}
               </h2>
               <p className="mt-2 text-sm text-slate-200">
@@ -616,11 +614,11 @@ export function LeadIntelligence() {
             </div>
             <div className="grid min-w-[210px] grid-cols-2 gap-2 text-center">
               <div className="rounded-xl bg-white/10 p-3">
-                <p className="num text-2xl font-black">{fmtNum(data.totals.leads)}</p>
+                <p className="num text-2xl font-medium">{fmtNum(data.totals.leads)}</p>
                 <p className="text-xs text-slate-200">{A ? "ليد" : "Leads"}</p>
               </div>
               <div className="rounded-xl bg-white/10 p-3">
-                <p className="num text-2xl font-black text-emerald-300">
+                <p className="num text-2xl font-medium text-emerald-300">
                   {fmtNum(data.totals.won)}
                 </p>
                 <p className="text-xs text-slate-200">Won</p>
@@ -628,7 +626,7 @@ export function LeadIntelligence() {
             </div>
           </div>
           <div className="mt-6 flex flex-wrap gap-3 border-t border-white/15 pt-5">
-            <label className="text-xs font-bold text-slate-200">
+            <label className="text-xs font-medium text-slate-200">
               {A ? "الكورس" : "Course"}
               <select
                 aria-label={A ? "فلتر الكورس" : "Course filter"}
@@ -647,7 +645,7 @@ export function LeadIntelligence() {
                 ))}
               </select>
             </label>
-            <label className="text-xs font-bold text-slate-200">
+            <label className="text-xs font-medium text-slate-200">
               {A ? "مسؤول المبيعات" : "Salesperson"}
               <select
                 aria-label={A ? "فلتر مسؤول المبيعات" : "Salesperson filter"}
@@ -693,12 +691,15 @@ export function LeadIntelligence() {
           {A
             ? `وصل فعلًا مقابل المطلوب حتى ${data.period.to || "نهاية الفترة"}. لكل شهر: المطلوب = هدف الشهر × أيام الفترة داخل الشهر ÷ أيام الشهر. هدف الشهر الكامل معروض منفصلًا.`
             : `Actual leads are compared with the pace through ${data.period.to || "the period end"}. For each month, period pace = full-month target × selected days in that month ÷ days in the month.`}{" "}
-          <a href="/media-plan" className="font-bold text-sky-strong underline underline-offset-2">
+          <a
+            href="/media-plan"
+            className="font-medium text-sky-strong underline underline-offset-2"
+          >
             {A ? "افتح خطة الميديا" : "Open media plan"}
           </a>
         </div>
         {targetCourses.some((row) => row.targetCoverage.startsWith("draft")) && (
-          <div className="rounded-xl border border-amber-strong/30 bg-amber-surface px-4 py-3 text-xs font-semibold text-amber-strong">
+          <div className="rounded-xl border border-amber-strong/30 bg-amber-surface px-4 py-3 text-xs font-medium text-amber-strong">
             {A
               ? "«مسودة» تعني أن أهداف خطة الميديا لم تُعتمد بعد. أعداد الليدز الفعلية مأخوذة من Odoo، والمقارنة مع الهدف استرشادية."
               : "Draft means the media-plan targets are not yet approved. Actual lead counts come from Odoo; target comparisons are provisional."}
@@ -715,9 +716,9 @@ export function LeadIntelligence() {
                 className={`rounded-2xl border bg-surface p-4 shadow-sm ${difference === null ? "border-border" : difference >= 0 ? "border-mint-strong/30" : "border-amber-strong/30"}`}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-base font-black text-text">{row.course}</p>
+                  <p className="text-base font-medium text-text">{row.course}</p>
                   <span
-                    className={`rounded-full px-2 py-1 text-[12px] font-bold ${row.target === null ? "bg-surface-3 text-text-muted" : row.targetCoverage.startsWith("draft") ? "bg-amber-surface text-amber-strong" : "bg-sky-surface text-sky-strong"}`}
+                    className={`rounded-full px-2 py-1 text-[12px] font-medium ${row.target === null ? "bg-surface-3 text-text-muted" : row.targetCoverage.startsWith("draft") ? "bg-amber-surface text-amber-strong" : "bg-sky-surface text-sky-strong"}`}
                   >
                     {row.target === null
                       ? A
@@ -734,28 +735,28 @@ export function LeadIntelligence() {
                 </div>
                 <div className="mt-4 flex items-baseline justify-between gap-2 rounded-xl bg-surface-2 px-3 py-2 text-xs text-text-muted">
                   <span>{A ? "هدف الشهر كاملًا" : "Full-month target"}</span>
-                  <b className="num text-base font-black text-text">
+                  <b className="num text-base font-medium text-text">
                     {num(row.target)} {A ? "ليد" : "leads"}
                   </b>
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <div className="rounded-xl bg-sky-surface px-3 py-3">
-                    <p className="text-[12px] font-bold text-sky-strong">
+                    <p className="text-[12px] font-medium text-sky-strong">
                       {A ? "وصل فعلًا" : "Actually received"}
                     </p>
-                    <p className="num mt-1 text-2xl font-black text-text">{fmtNum(row.leads)}</p>
+                    <p className="num mt-1 text-2xl font-medium text-text">{fmtNum(row.leads)}</p>
                   </div>
                   <div className="rounded-xl bg-surface-2 px-3 py-3">
-                    <p className="text-[12px] font-bold text-text-muted">
+                    <p className="text-[12px] font-medium text-text-muted">
                       {A
                         ? `المطلوب حتى ${data.period.to || "اليوم"}`
                         : `Needed by ${data.period.to || "today"}`}
                     </p>
-                    <p className="num mt-1 text-2xl font-black text-text">{num(expected)}</p>
+                    <p className="num mt-1 text-2xl font-medium text-text">{num(expected)}</p>
                   </div>
                 </div>
                 <p
-                  className={`mt-3 text-xs font-bold ${difference === null ? "text-text-muted" : difference >= 0 ? "text-mint-strong" : "text-amber-strong"}`}
+                  className={`mt-3 text-xs font-medium ${difference === null ? "text-text-muted" : difference >= 0 ? "text-mint-strong" : "text-amber-strong"}`}
                 >
                   {difference === null
                     ? A
@@ -839,14 +840,14 @@ export function LeadIntelligence() {
           </Expand>
         )}
         <div>
-          <p className="mb-3 text-sm font-bold text-text">
+          <p className="mb-3 text-sm font-medium text-text">
             {A ? "وصول الليدز يومًا بيوم" : "Daily lead arrivals"}
           </p>
           <div className="overflow-x-auto rounded-2xl border border-border bg-surface-2/40 p-4">
             <div className="flex h-36 min-w-max items-end gap-2">
               {data.daily.map((day) => (
                 <div key={day.day} className="flex w-8 flex-col items-center gap-1">
-                  <span className="num text-[12px] font-bold text-text">{day.leads}</span>
+                  <span className="num text-[12px] font-medium text-text">{day.leads}</span>
                   <div className="relative flex h-24 w-5 items-end rounded-md bg-surface-3">
                     <div
                       className="w-full rounded-md bg-sky-strong"
@@ -909,16 +910,16 @@ export function LeadIntelligence() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <span className="mb-2 inline-block rounded-full bg-violet-surface px-2 py-0.5 text-[12px] font-bold text-violet-strong">
+                  <span className="mb-2 inline-block rounded-full bg-violet-surface px-2 py-0.5 text-[12px] font-medium text-violet-strong">
                     {row.course === "Multiple"
                       ? A
                         ? "أكثر من كورس"
                         : "Multiple courses"
                       : row.course || (A ? "كورس غير محدد" : "Unassigned course")}
                   </span>
-                  <p className="break-words text-sm font-bold text-text">{row.name || "—"}</p>
+                  <p className="break-words text-sm font-medium text-text">{row.name || "—"}</p>
                 </div>
-                <span className="num shrink-0 rounded-xl bg-sky-surface px-2 py-1 text-base font-black text-sky-strong">
+                <span className="num shrink-0 rounded-xl bg-sky-surface px-2 py-1 text-base font-medium text-sky-strong">
                   {fmtNum(row.leads)}
                 </span>
               </div>
@@ -946,7 +947,7 @@ export function LeadIntelligence() {
           <button
             type="button"
             onClick={() => setMoreCampaigns(!moreCampaigns)}
-            className="rounded-xl border border-sky-strong/30 px-4 py-2 text-xs font-bold text-sky-strong"
+            className="rounded-xl border border-sky-strong/30 px-4 py-2 text-xs font-medium text-sky-strong"
           >
             {moreCampaigns
               ? A
@@ -1028,7 +1029,7 @@ export function LeadIntelligence() {
               key={status}
               className="flex items-baseline justify-between gap-3 rounded-xl border border-border px-4 py-3"
             >
-              <span className={`text-sm font-bold ${color}`}>{label}</span>
+              <span className={`text-sm font-medium ${color}`}>{label}</span>
               <span className="num text-sm text-text">
                 <b>{fmtNum(summary.count)}</b>
                 <span className="mx-2 text-text-muted">·</span>
@@ -1053,7 +1054,7 @@ export function LeadIntelligence() {
                       : "1 day"
                     : `${bucket.label} ${A ? "يوم" : "days"}`}
               </p>
-              <p className="num my-2 text-xl font-black text-text">{fmtNum(bucket.count)}</p>
+              <p className="num my-2 text-xl font-medium text-text">{fmtNum(bucket.count)}</p>
               <div className="h-2 rounded-full bg-surface-3">
                 <div
                   className={`h-2 rounded-full ${tone[i % tone.length]}`}
@@ -1080,7 +1081,7 @@ export function LeadIntelligence() {
                   href={row.odooUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 font-bold text-sky-strong"
+                  className="inline-flex items-center gap-1 font-medium text-sky-strong"
                 >
                   #{row.id}
                   <ArrowUpRight size={12} />
@@ -1088,8 +1089,8 @@ export function LeadIntelligence() {
                 <span
                   className={
                     row.status === "won"
-                      ? "font-bold text-mint-strong"
-                      : "font-bold text-amber-strong"
+                      ? "font-medium text-mint-strong"
+                      : "font-medium text-amber-strong"
                   }
                 >
                   {row.status === "won" ? (A ? "ناجحة" : "Won") : A ? "مفقودة" : "Lost"}
@@ -1162,7 +1163,7 @@ export function LeadIntelligence() {
               <div key={row.course} className="rounded-2xl border border-border p-4">
                 <div className="flex items-center justify-between">
                   <b className="text-sm text-text">{row.course}</b>
-                  <span className="num text-sm font-black text-text">
+                  <span className="num text-sm font-medium text-text">
                     {fmtNum(row.leads)} Leads
                   </span>
                 </div>
@@ -1186,7 +1187,7 @@ export function LeadIntelligence() {
                   <span className="text-text-muted">
                     {A ? "مفتوح" : "Open"} <b className="num">{row.open}</b>
                   </span>
-                  <span className="ms-auto font-bold text-sky-strong">
+                  <span className="ms-auto font-medium text-sky-strong">
                     ROAS {fmtRoas(row.roas)}
                   </span>
                 </div>
@@ -1219,12 +1220,12 @@ export function LeadIntelligence() {
             },
           ].map((group) => (
             <div key={group.label} className="overflow-hidden rounded-2xl border border-border">
-              <h4 className={`px-4 py-3 text-sm font-bold ${group.style}`}>{group.label}</h4>
+              <h4 className={`px-4 py-3 text-sm font-medium ${group.style}`}>{group.label}</h4>
               <div className="divide-y divide-border">
                 {group.rows.length ? (
                   group.rows.map((row) => (
                     <div key={`${row.course}-${row.owner}`} className="px-4 py-3">
-                      <p className="text-sm font-bold text-text">{row.owner}</p>
+                      <p className="text-sm font-medium text-text">{row.owner}</p>
                       <p className="mt-1 text-xs text-text-muted">
                         {row.course} · <b className="num">{row.leads}</b> Leads ·{" "}
                         <b className="num text-mint-strong">{row.won}</b> Won ·{" "}

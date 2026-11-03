@@ -226,9 +226,7 @@ export function GlobalSearch() {
     listRef.current?.querySelector('[data-active="true"]')?.scrollIntoView({ block: "nearest" });
   }, [active]);
 
-  const placeholder = A
-    ? "ابحث عن تقرير أو حملة أو مادة إعلانية…"
-    : "Search reports, campaigns, creatives…";
+  const placeholder = A ? "بحث" : "Search";
   let cursor = -1;
 
   return (
@@ -240,15 +238,11 @@ export function GlobalSearch() {
             type="button"
             aria-label={A ? "بحث شامل" : "Global search"}
             title={`${A ? "بحث شامل" : "Global search"} (⌘K)`}
-            className="global-search-trigger group relative inline-flex h-11 min-w-11 cursor-pointer items-center gap-2 overflow-hidden rounded-xl border border-brand/35 bg-[linear-gradient(110deg,var(--brand-soft),var(--surface)_58%)] px-2.5 text-[13px] text-text shadow-sm transition-[border-color,background,transform] hover:border-brand/60 hover:bg-surface-2 active:scale-[0.97] sm:h-9 md:min-w-[260px]"
+            className="global-search-trigger group relative inline-flex h-10 min-w-10 cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface-2 px-2.5 text-[13px] text-text-muted transition-colors hover:border-border-strong hover:text-text sm:h-9 md:min-w-[240px]"
           >
-            <span className="relative z-10 grid size-7 shrink-0 place-items-center rounded-lg bg-brand text-white shadow-sm">
-              <Search size={16} aria-hidden="true" />
-            </span>
-            <span className="relative z-10 hidden min-w-0 truncate text-start md:inline">
-              {placeholder}
-            </span>
-            <kbd className="relative z-10 ms-auto hidden shrink-0 rounded-md border border-brand/25 bg-surface/80 px-1.5 py-0.5 text-[12px] font-bold text-brand shadow-sm lg:inline">
+            <Search size={16} className="shrink-0 text-text-subtle" aria-hidden="true" />
+            <span className="hidden min-w-0 truncate text-start md:inline">{placeholder}</span>
+            <kbd className="num ms-auto hidden shrink-0 rounded border border-border bg-surface px-1.5 py-0.5 text-[12px] font-normal text-text-subtle lg:inline">
               ⌘K
             </kbd>
           </button>
@@ -306,7 +300,7 @@ export function GlobalSearch() {
             ) : (
               groups.map((group) => (
                 <section key={group.title} className="mb-1.5 last:mb-0">
-                  <h3 className="px-2.5 pb-1 pt-2 text-[12px] font-bold uppercase tracking-wide text-text-subtle">
+                  <h3 className="px-2.5 pb-1 pt-2 text-[12px] font-medium text-text-subtle">
                     {group.title}
                   </h3>
                   <ul>
@@ -327,7 +321,7 @@ export function GlobalSearch() {
                           >
                             <Icon size={16} className="shrink-0 opacity-75" aria-hidden="true" />
                             <span className="min-w-0 flex-1">
-                              <span className="block truncate text-[13.5px] font-semibold">
+                              <span className="block truncate text-[13.5px] font-medium">
                                 {row.label}
                               </span>
                               {row.meta && (

@@ -121,7 +121,7 @@ function BudgetLeaksCard({ rows, lang }: { rows: PerfRow[]; lang: "ar" | "en" })
           <div className="table-wrap scroll-hint-x">
             <table className="w-full min-w-[520px] text-sm">
               <thead>
-                <tr className="text-[12px] uppercase tracking-wide text-text-muted">
+                <tr className="text-[12px] text-text-muted">
                   <th className="py-2 text-start">{t("campaign")}</th>
                   <th className="py-2 text-end">{t("spend")}</th>
                   <th className="py-2 text-end">{t("revenue")}</th>
@@ -181,7 +181,7 @@ function AccountsCard({
         <div className="table-wrap scroll-hint-x">
           <table className="w-full min-w-[420px] text-sm">
             <thead>
-              <tr className="text-[12px] uppercase tracking-wide text-text-muted">
+              <tr className="text-[12px] text-text-muted">
                 <th className="py-2 text-start">{t("account")}</th>
                 <th className="py-2 text-end">{t("spend")}</th>
                 <th className="py-2 text-end">{t("platform_leads")}</th>
@@ -285,7 +285,7 @@ function TopCoursesPanel({
           {shown.map((row, index) => (
             <li key={row.course} className="flex items-center gap-2.5">
               <span
-                className="num grid size-6 shrink-0 place-items-center rounded-lg text-[12px] font-bold"
+                className="num grid size-6 shrink-0 place-items-center rounded-lg text-[12px] font-medium"
                 style={
                   index === 0
                     ? { background: "var(--amber-strong)", color: "#fff" }
@@ -296,7 +296,7 @@ function TopCoursesPanel({
               </span>
               <span className="min-w-0 flex-1">
                 <span
-                  className="block truncate text-[13px] font-semibold text-text"
+                  className="block truncate text-[13px] font-medium text-text"
                   title={row.course}
                 >
                   {row.course}
@@ -307,7 +307,7 @@ function TopCoursesPanel({
                   </span>
                 )}
               </span>
-              <bdi className="num shrink-0 text-[13px] font-bold text-text">
+              <bdi className="num shrink-0 text-[13px] font-medium text-text">
                 {formatDisplayMoney(
                   usdToDisplayCurrency(row.revenue, currency, sarRate),
                   currency,
@@ -342,14 +342,14 @@ function CourseContributionChart({
     );
   return (
     <div>
-      <div className="mb-2 grid grid-cols-[minmax(72px,0.8fr)_minmax(108px,1.5fr)_minmax(70px,0.7fr)] gap-2 px-2 text-[12px] font-semibold uppercase tracking-wide text-text-subtle sm:grid-cols-[minmax(100px,0.8fr)_minmax(160px,2fr)_minmax(88px,0.7fr)] sm:gap-3">
+      <div className="mb-2 grid grid-cols-[minmax(72px,0.8fr)_minmax(108px,1.5fr)_minmax(70px,0.7fr)] gap-2 px-2 text-[12px] font-medium text-text-subtle sm:grid-cols-[minmax(100px,0.8fr)_minmax(160px,2fr)_minmax(88px,0.7fr)] sm:gap-3">
         <span>{lang === "ar" ? "الدورة" : "Course"}</span>
         <span>{lang === "ar" ? "المساهمة في المبيعات" : "Sales contribution"}</span>
         <span className="text-end">
           {lang === "ar" ? "متوسط البيع" : "Average sale"} ({currency})
         </span>
       </div>
-      <div className="max-h-[390px] space-y-1.5 overflow-y-auto pe-1">
+      <div className="max-h-[392px] space-y-1.5 overflow-y-auto pe-1">
         {rows.map((row, index) => (
           <div
             key={row.course}
@@ -358,7 +358,7 @@ function CourseContributionChart({
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
                 <span className="num text-[12px] text-text-subtle">#{index + 1}</span>
-                <span className="truncate text-xs font-semibold text-text" title={row.course}>
+                <span className="truncate text-xs font-medium text-text" title={row.course}>
                   {row.course}
                 </span>
               </div>
@@ -385,7 +385,7 @@ function CourseContributionChart({
               </div>
             </div>
             <div className="text-end">
-              <div className="num text-xs font-semibold text-text">
+              <div className="num text-xs font-medium text-text">
                 {formatDisplayMoney(
                   usdToDisplayCurrency(row.averageSalePrice, currency, sarRate),
                   currency,
@@ -401,7 +401,7 @@ function CourseContributionChart({
         ))}
       </div>
       <div className="mt-3 flex justify-end">
-        <Link to="/courses" className="text-[12px] font-semibold text-brand hover:underline">
+        <Link to="/courses" className="text-[12px] font-medium text-brand hover:underline">
           {lang === "ar" ? "فتح تقرير الدورات الكامل ←" : "Open full courses report →"}
         </Link>
       </div>

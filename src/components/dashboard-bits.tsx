@@ -75,20 +75,20 @@ export function DashboardPageHeader({
   return (
     <header className={flush ? "" : "mb-4"}>
       <div
-        className="page-band flex flex-wrap items-center gap-x-5 gap-y-3 rounded-[26px] px-5 py-5 sm:px-7 sm:py-6"
+        className="page-band flex flex-wrap items-center gap-x-5 gap-y-3 px-0 pb-4"
         style={{ "--page-accent": accent.strong } as React.CSSProperties}
       >
-        <div className="flex w-full min-w-0 items-center gap-3 sm:w-auto sm:flex-1">
+        <div className="flex w-full min-w-0 items-center gap-2.5 sm:w-auto sm:flex-1">
           {icon && (
             <span
-              className="page-band-icon grid size-12 shrink-0 place-items-center rounded-2xl"
+              className="page-band-icon grid size-5 shrink-0 place-items-center text-text-subtle"
               aria-hidden="true"
             >
               {icon}
             </span>
           )}
           <div className="min-w-0">
-            <h1 className="text-balance text-[23px] font-bold leading-tight tracking-[-0.02em] text-text sm:text-[30px]">
+            <h1 className="text-balance text-[22px] font-medium leading-tight tracking-[-0.02em] text-text sm:text-[28px]">
               {title}
             </h1>
             {subtitle && (
@@ -101,7 +101,7 @@ export function DashboardPageHeader({
 
         <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2">
           {period && (
-            <span className="inline-flex max-w-full items-center gap-1.5 rounded-xl border border-border bg-surface-2 px-3 py-1.5 text-[12px] font-semibold text-text">
+            <span className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[12px] font-normal text-text-muted">
               <CalendarDays size={13} className="shrink-0" aria-hidden="true" />
               <bdi className="num truncate">{period}</bdi>
             </span>
@@ -216,12 +216,10 @@ export function PageSection({
         )}
         <div className="min-w-0">
           {level === "records" ? (
-            <h2 className="text-[12px] font-bold uppercase tracking-[0.06em] text-text-muted">
-              {title}
-            </h2>
+            <h2 className="text-[12px] font-medium text-text-muted">{title}</h2>
           ) : (
             <h2
-              className={`font-bold leading-snug tracking-[-0.01em] text-text ${
+              className={`font-medium leading-snug tracking-[-0.01em] text-text ${
                 level === "primary" ? "text-[16px] sm:text-[17px]" : "text-[14px] sm:text-[15px]"
               }`}
             >
@@ -279,7 +277,7 @@ export function MoreDetails({
       >
         <LayoutGrid size={15} className="shrink-0 text-text-subtle" aria-hidden="true" />
         <span className="min-w-0 flex-1">
-          <span className="block text-[13.5px] font-semibold text-text">
+          <span className="block text-[13.5px] font-medium text-text">
             {label ?? (lang === "ar" ? "تفاصيل أكثر" : "More details")}
           </span>
           {hint && <span className="mt-0.5 block text-[12px] text-text-muted">{hint}</span>}
@@ -337,7 +335,7 @@ export function WorkspaceLinks({ links }: { links: WorkspaceLink[] }) {
           </span>
           <span className="min-w-0 flex-1">
             <span
-              className="block truncate text-[13.5px] font-bold"
+              className="block truncate text-[13.5px] font-medium"
               style={{ color: "var(--tone-ink)" }}
             >
               {link.title}
@@ -347,7 +345,7 @@ export function WorkspaceLinks({ links }: { links: WorkspaceLink[] }) {
             </span>
             {link.figure && (
               <bdi
-                className="num mt-1 block truncate text-[12px] font-semibold"
+                className="num mt-1 block truncate text-[12px] font-medium"
                 style={{ color: "var(--tone-ink)" }}
               >
                 {link.figure}
@@ -447,7 +445,7 @@ export function ViewSelect<T extends string>({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value as T)}
-        className="min-h-10 min-w-0 cursor-pointer rounded-lg border border-border bg-surface px-2.5 text-[13px] font-semibold text-text"
+        className="min-h-10 min-w-0 cursor-pointer rounded-lg border border-border bg-surface px-2.5 text-[13px] font-medium text-text"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -473,12 +471,22 @@ export function ViewSelect<T extends string>({
  * then 3 + 2 again, then 2 + 2 + 1-across-the-width, then one column under
  * 360px. The rules live in `styles.css` under THE KPI GRID.
  */
-export function KpiRow({ children, className = "" }: { children: ReactNode; className?: string }) {
+export function KpiRow({
+  children,
+  className = "",
+  flush = false,
+}: {
+  children: ReactNode;
+  className?: string;
+  /** Drop the strip's own card, for a row that already sits inside one. */
+  flush?: boolean;
+}) {
   const count = Children.toArray(children).filter(Boolean).length;
   return (
     <div className="kpi-scope">
       <div
         className={`kpi-grid ${className}`}
+        data-flush={flush ? "" : undefined}
         data-count={count}
         data-odd={count % 2 === 1 ? "true" : undefined}
       >
@@ -509,11 +517,11 @@ export function SecondaryMetrics({
   const heading = label ?? (lang === "ar" ? "مؤشرات إضافية" : "More metrics");
   return (
     <details className="group card overflow-hidden" open={defaultOpen}>
-      <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2.5 px-4 py-3 text-[13px] font-semibold text-text [&::-webkit-details-marker]:hidden sm:px-5">
+      <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2.5 px-4 py-3 text-[13px] font-medium text-text [&::-webkit-details-marker]:hidden sm:px-5">
         <LayoutGrid size={15} className="shrink-0 text-text-subtle" aria-hidden="true" />
         <span className="min-w-0 flex-1 truncate">{heading}</span>
         {count !== undefined && (
-          <span className="num rounded-full bg-surface-2 px-2 py-0.5 text-[12px] font-bold text-text-muted">
+          <span className="num rounded-full bg-surface-2 px-2 py-0.5 text-[12px] font-medium text-text-muted">
             {count}
           </span>
         )}
@@ -588,6 +596,7 @@ export function InsightCard({
   ariaLabel,
   testId,
   index = 0,
+  variant,
 }: {
   kind: InsightKind;
   /** Overrides the default eyebrow wording. */
@@ -605,6 +614,13 @@ export function InsightCard({
   ariaLabel?: string;
   testId?: string;
   index?: number;
+  /**
+   * How the block is finished. `dark` is the one near-black surface on the
+   * page, for the reading that is good news; `fill` is a soft tint. Default is
+   * the ordinary white card. A page of identical white cards has no shape, and
+   * one block in a different material is what gives the eye a place to land.
+   */
+  variant?: "dark" | "fill";
 }) {
   const { lang } = useI18n();
   const tone = INSIGHT_TONE[kind];
@@ -617,7 +633,7 @@ export function InsightCard({
     <>
       <div className="flex items-center justify-between gap-3">
         <span
-          className="inline-flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wide"
+          className="inline-flex items-center gap-1.5 text-[12px] font-medium"
           style={{ color: "var(--tone-strong)" }}
         >
           <span
@@ -644,7 +660,7 @@ export function InsightCard({
 
       {value != null && (
         <div
-          className="num kpi-figure mt-2.5 text-[30px] font-bold leading-none"
+          className="num kpi-figure mt-2.5 text-[30px] font-medium leading-none"
           style={{ color: "var(--tone-ink)" }}
         >
           {value}
@@ -652,7 +668,7 @@ export function InsightCard({
       )}
 
       <div
-        className={`text-[13.5px] font-semibold leading-snug ${value != null ? "mt-1.5" : "mt-2.5"}`}
+        className={`text-[13.5px] font-medium leading-snug ${value != null ? "mt-1.5" : "mt-2.5"}`}
         style={{ color: "var(--tone-ink)" }}
       >
         {title}
@@ -670,7 +686,7 @@ export function InsightCard({
         /* `mt-auto` pins the cue to the foot of the card, so a row of readings
            lines up along the bottom however long each explanation runs. */
         <span
-          className="kpi-cue mt-auto inline-flex items-center gap-1 pt-2.5 text-[12px] font-bold"
+          className="kpi-cue mt-auto inline-flex items-center gap-1 pt-2.5 text-[12px] font-medium"
           style={{ color: "var(--brand)" }}
         >
           {actionLabel}
@@ -689,8 +705,21 @@ export function InsightCard({
     (interactive
       ? "kpi-card lift cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
       : "");
+  /* The tone variables are written inline, so a stylesheet rule cannot reach
+     them — an inline custom property always wins. The dark block therefore
+     has to redefine them here, or its figure renders black on black. */
   const style = {
     ...cardToneVars(tone),
+    ...(variant === "dark"
+      ? {
+          "--tone-surface": "#17171a",
+          "--tone-border": "transparent",
+          "--tone-ink": "#ffffff",
+          "--tone-strong": "#5fd39b",
+          "--text-muted": "#a5a5ad",
+          "--brand": "#93a9ff",
+        }
+      : null),
     "--i": index,
     boxShadow: "var(--shadow-xs)",
   } as React.CSSProperties;
@@ -702,6 +731,7 @@ export function InsightCard({
         search={search as never}
         className={shell}
         style={style}
+        data-variant={variant}
         data-metric-trigger=""
         data-testid={testId}
       >
@@ -723,13 +753,14 @@ export function InsightCard({
         data-testid={testId}
         className={`${shell} w-full`}
         style={style}
+        data-variant={variant}
       >
         {body}
       </button>
     );
   }
   return (
-    <div className={shell} style={style} data-testid={testId}>
+    <div className={shell} style={style} data-variant={variant} data-testid={testId}>
       {body}
     </div>
   );
@@ -749,10 +780,9 @@ export function InsightRow({
   children: ReactNode;
   className?: string;
 }) {
-  // Three across from `md`, not `lg`: between 768 and 1024 there is no
-  // navigation rail, so three readings clear the 205px a card needs — and a
-  // full-width reading at that size is a very wide box holding two short lines.
-  return <div className={`card-grid md:grid-cols-3 ${className}`}>{children}</div>;
+  // A twelve-column track rather than three equal thirds, so the reading that
+  // carries a figure can take more width than the two that carry a sentence.
+  return <div className={`dash-grid ${className}`}>{children}</div>;
 }
 
 /* --- panels -------------------------------------------------------------- */
@@ -804,7 +834,7 @@ export function DashboardPanel({
               </span>
             )}
             <div className="min-w-0">
-              <h2 className="text-[15px] font-bold leading-snug tracking-[-0.01em] text-text">
+              <h2 className="text-[15px] font-medium leading-snug tracking-[-0.01em] text-text">
                 {title}
               </h2>
               {hint && <p className="mt-0.5 text-[12px] leading-snug text-text-muted">{hint}</p>}
@@ -880,7 +910,7 @@ export function RankingPanel({
         moreTo ? (
           <Link
             to={moreTo}
-            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-bold text-brand hover:bg-brand-soft"
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] font-medium text-brand hover:bg-brand-soft"
           >
             {moreLabel ?? (lang === "ar" ? "عرض الكل" : "View all")}
             {lang === "ar" ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
@@ -897,7 +927,7 @@ export function RankingPanel({
             const row = (
               <>
                 <span
-                  className="num grid size-6 shrink-0 place-items-center rounded-lg text-[12px] font-bold"
+                  className="num grid size-6 shrink-0 place-items-center rounded-lg text-[12px] font-medium"
                   style={
                     i === 0
                       ? { background: t.strong, color: "#fff" }
@@ -911,7 +941,7 @@ export function RankingPanel({
                     <span className="truncate text-[13px] font-medium text-text" title={item.label}>
                       {item.label}
                     </span>
-                    <span className="num shrink-0 text-[13px] font-bold text-text">
+                    <span className="num shrink-0 text-[13px] font-medium text-text">
                       {item.value}
                     </span>
                   </span>
@@ -973,7 +1003,7 @@ export function CompactTable({
     <div className={`table-wrap scroll-hint-x -mx-1 px-1 ${className}`}>
       <table className="w-full text-sm" style={{ minWidth }}>
         <thead>
-          <tr className="text-[12px] font-bold uppercase tracking-wide text-text-subtle">{head}</tr>
+          <tr className="text-[12px] font-medium text-text-subtle">{head}</tr>
         </thead>
         <tbody className="[&>tr]:border-t [&>tr]:border-border [&>tr:hover]:bg-surface-2">
           {children}
@@ -1072,7 +1102,7 @@ export function DataHealthButton({
           <StatusIcon size={16} aria-hidden="true" />
         </span>
         <span className="min-w-0">
-          <span className="block text-[12.5px] font-bold leading-tight">{headline}</span>
+          <span className="block text-[12.5px] font-medium leading-tight">{headline}</span>
           <span className="block text-[12px] leading-tight text-text-muted">
             {issues.length > 0
               ? lang === "ar"
@@ -1099,7 +1129,7 @@ export function DataHealthButton({
               <StatusIcon size={18} aria-hidden="true" />
             </span>
             <div className="min-w-0">
-              <SheetTitle className="text-[15px] font-bold" style={{ color: t.ink }}>
+              <SheetTitle className="text-[15px] font-medium" style={{ color: t.ink }}>
                 {lang === "ar" ? "صحة البيانات" : "Data health"}
               </SheetTitle>
               <SheetDescription className="text-[12px]" style={{ color: t.ink, opacity: 0.75 }}>
@@ -1153,7 +1183,7 @@ export function DataHealthButton({
 
           {technical.length > 0 && (
             <details className="group border-t border-border">
-              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-5 py-2.5 text-[12px] font-semibold text-text-muted hover:text-text [&::-webkit-details-marker]:hidden">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-5 py-2.5 text-[12px] font-medium text-text-muted hover:text-text [&::-webkit-details-marker]:hidden">
                 <span className="flex-1">
                   {lang === "ar" ? "تفاصيل تقنية" : "Technical details"}
                 </span>
@@ -1210,7 +1240,7 @@ export function ExecutiveSummary({ title, children }: { title: string; children:
     <>
       <details className="group card overflow-hidden sm:hidden">
         <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3.5 py-2.5 [&::-webkit-details-marker]:hidden">
-          <span className="text-[13px] font-semibold text-text">{title}</span>
+          <span className="text-[13px] font-medium text-text">{title}</span>
           <span className="flex items-center gap-2 text-[12px] text-text-muted">
             {lang === "ar" ? "اضغط للقراءة" : "Tap to read"}
             <ChevronDownGlyph />
@@ -1315,7 +1345,7 @@ export function SourceErrorNotice({
         <button
           type="button"
           onClick={onRetry}
-          className="shrink-0 rounded-lg border border-border px-2.5 py-1 text-[12px] font-semibold"
+          className="shrink-0 rounded-lg border border-border px-2.5 py-1 text-[12px] font-medium"
         >
           {lang === "ar" ? "إعادة المحاولة" : "Try again"}
         </button>
@@ -1355,11 +1385,11 @@ export function AlertBar({
       {/* The icon is the only thing that may not shrink. The title itself wraps:
           `shrink-0` on the whole span pushed a 56-character English heading
           straight off the right edge of a 390px screen. */}
-      <span className="inline-flex min-w-0 items-start gap-2 text-[12.5px] font-bold">
+      <span className="inline-flex min-w-0 items-start gap-2 text-[12.5px] font-medium">
         <AlertTriangle
           size={15}
           aria-hidden="true"
-          className="mt-[3px] shrink-0"
+          className="mt-1 shrink-0"
           style={{ color: t.strong }}
         />
         <span className="min-w-0">{title}</span>
@@ -1411,10 +1441,8 @@ export function SupportingFacts({ items }: { items: SupportingFactItem[] }) {
               {item.icon}
             </span>
             <div className="min-w-0">
-              <div className="text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
-                {item.label}
-              </div>
-              <div className="truncate text-[14px] font-bold text-text" title={item.value}>
+              <div className="text-[12px] font-medium text-text-subtle">{item.label}</div>
+              <div className="truncate text-[14px] font-medium text-text" title={item.value}>
                 {item.value}
               </div>
               {item.detail && (
@@ -1441,7 +1469,7 @@ export function InfoDot({ text }: { text: string }) {
   const { lang } = useI18n();
   return (
     <span
-      className="grid size-4 shrink-0 cursor-help place-items-center rounded-full text-[12px] font-bold opacity-55"
+      className="grid size-4 shrink-0 cursor-help place-items-center rounded-full text-[12px] font-medium opacity-55"
       style={{ background: "var(--tone-strong)", color: "#fff" }}
       title={text}
       role="note"

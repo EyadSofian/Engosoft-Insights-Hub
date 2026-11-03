@@ -1101,9 +1101,8 @@ function SocialMedia() {
         <div className="card-grid md:grid-cols-2 xl:grid-cols-4">
           {ads.data.byPlatform.map((channel) => (
             <Card key={channel.platform} className="relative overflow-hidden" hoverable>
-              <div className="absolute inset-x-0 top-0 h-1 bg-brand" />
               <div className="flex items-center justify-between gap-2">
-                <h3 className="text-base font-bold text-text">
+                <h3 className="text-base font-medium text-text">
                   {PLATFORM_LABEL[channel.platform] ?? channel.platform}
                 </h3>
                 <Pill tone={channel.spend > 0 ? "success" : "neutral"}>
@@ -1223,7 +1222,7 @@ function SocialMedia() {
 
             <Card padded={false} className="mt-4 overflow-hidden">
               <div className="border-b border-border px-4 py-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-text">
+                <div className="flex items-center gap-2 text-sm font-medium text-text">
                   <UserRoundCheck size={17} className="text-brand" />
                   {lang === "ar" ? "أداء فريق الموديريشن" : "Moderator performance"}
                 </div>

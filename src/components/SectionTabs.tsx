@@ -100,12 +100,12 @@ export function SectionTabs() {
             but it never disappears. */}
         <div className="flex min-w-0 max-w-[45%] shrink items-center gap-2 pe-2 text-sm font-semibold text-text sm:max-w-none sm:shrink-0 sm:pe-3">
           <span
-            className="grid size-7 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand"
+            className="grid size-5 shrink-0 place-items-center text-text-subtle"
             aria-hidden="true"
           >
-            <SectionIcon size={15} />
+            <SectionIcon size={18} strokeWidth={1.5} />
           </span>
-          <span className="truncate text-[12.5px] sm:text-sm">{label}</span>
+          <span className="truncate text-[13px] sm:text-sm">{label}</span>
           <span className="h-6 w-px shrink-0 bg-border" aria-hidden="true" />
         </div>
 
@@ -115,7 +115,7 @@ export function SectionTabs() {
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className="inline-flex min-h-10 max-w-full cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface px-3 text-[13px] font-semibold text-text transition-colors hover:bg-surface-2 sm:text-sm"
+                  className="inline-flex min-h-10 max-w-full cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface px-3 text-[13px] font-medium text-text transition-colors hover:bg-surface-2 sm:text-sm"
                   aria-label={lang === "ar" ? "اختيار تقرير آخر" : "Switch report"}
                 >
                   {(() => {
@@ -160,13 +160,18 @@ export function SectionTabs() {
                     search={item.search as never}
                     activeOptions={{ exact: true, includeSearch: true }}
                     aria-current={active ? "page" : undefined}
-                    className={`relative my-1.5 flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3 text-[13px] font-semibold transition-colors duration-150 sm:px-4 sm:text-sm ${
+                    className={`relative my-1.5 flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg border px-3 text-[13px] font-medium transition-colors duration-150 sm:px-4 sm:text-sm ${
                       active
-                        ? "border-brand bg-brand text-white shadow-sm"
-                        : "border-border bg-surface text-text-muted hover:bg-surface-2 hover:text-text"
+                        ? "border-border bg-surface-2 text-text"
+                        : "border-transparent bg-transparent text-text-muted hover:bg-surface-2 hover:text-text"
                     }`}
                   >
-                    <Icon size={16} strokeWidth={active ? 2.2 : 1.8} aria-hidden="true" />
+                    <Icon
+                      size={16}
+                      strokeWidth={1.5}
+                      className={active ? "text-brand" : undefined}
+                      aria-hidden="true"
+                    />
                     <span>{itemLabel(item, lang, t)}</span>
                   </Link>
                 );
@@ -178,7 +183,7 @@ export function SectionTabs() {
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    className="inline-flex min-h-10 max-w-full cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface px-3 text-[13px] font-semibold text-text"
+                    className="inline-flex min-h-10 max-w-full cursor-pointer items-center gap-2 rounded-lg border border-border bg-surface px-3 text-[13px] font-medium text-text"
                     aria-label={lang === "ar" ? "تغيير مساحة العمل" : "Switch workspace"}
                   >
                     {(() => {
@@ -221,13 +226,18 @@ export function SectionTabs() {
                           activeOptions={{ exact: true, includeSearch: true }}
                           aria-current={active ? "page" : undefined}
                           onClick={() => setMobileMenuOpen(false)}
-                          className={`flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-semibold ${
+                          className={`flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium ${
                             active
-                              ? "bg-brand text-white"
+                              ? "bg-surface-2 text-text"
                               : "text-text-muted hover:bg-surface-2 hover:text-text"
                           }`}
                         >
-                          <Icon size={16} aria-hidden="true" />
+                          <Icon
+                            size={16}
+                            strokeWidth={1.5}
+                            className={active ? "text-brand" : undefined}
+                            aria-hidden="true"
+                          />
                           <span>{itemLabel(item, lang, t)}</span>
                         </Link>
                       );

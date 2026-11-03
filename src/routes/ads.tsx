@@ -918,7 +918,7 @@ function CampaignPurposeSpend({ sections }: { sections: CampaignSpendSection[] }
                 {website && (
                   <Link
                     to="/website"
-                    className="shrink-0 text-[12px] font-semibold text-brand hover:underline"
+                    className="shrink-0 text-[12px] font-medium text-brand hover:underline"
                   >
                     {lang === "ar" ? "تفاصيل الموقع" : "Website detail"}
                   </Link>

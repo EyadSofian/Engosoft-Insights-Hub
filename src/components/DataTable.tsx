@@ -291,7 +291,7 @@ export function DataTable<T>({
                 ).map(([group, groupCols]) => (
                   <div key={group} className="mb-1.5 last:mb-0">
                     {group && groupLabels?.[group] && (
-                      <div className="px-2 pt-2 pb-1 text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
+                      <div className="px-2 pt-2 pb-1 text-[12px] font-medium text-text-subtle">
                         {groupLabels[group]}
                       </div>
                     )}
@@ -370,7 +370,7 @@ export function DataTable<T>({
                     key={i}
                     colSpan={b.span}
                     scope="colgroup"
-                    className={`px-3 pt-2 pb-1 text-[12px] font-semibold uppercase tracking-wide bg-surface-2 whitespace-nowrap text-start ${
+                    className={`px-3 pt-2 pb-1 text-[12px] font-semibold bg-surface-2 whitespace-nowrap text-start ${
                       i === 0 && visibleCols[0]?.sticky ? "sticky-col z-20" : ""
                     }`}
                     style={{
@@ -394,7 +394,7 @@ export function DataTable<T>({
                     aria-sort={sorted ? (sortDir === 1 ? "ascending" : "descending") : undefined}
                     scope="col"
                     title={c.headerTitle}
-                    className={`px-3 py-2.5 text-[12px] font-semibold uppercase tracking-wide bg-surface-2 border-b border-border whitespace-nowrap select-none ${
+                    className={`px-3 py-2.5 text-[12px] font-semibold bg-surface-2 border-b border-border whitespace-nowrap select-none ${
                       sortableBy(c) ? "cursor-pointer hover:text-text" : ""
                     } ${
                       c.align === "center"

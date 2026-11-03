@@ -109,7 +109,7 @@ function Teams() {
                     ].map((h, i) => (
                       <th
                         key={h}
-                        className={`px-3 py-2.5 text-[12px] font-semibold uppercase tracking-wide bg-surface-2 border-b border-border whitespace-nowrap text-text-muted ${
+                        className={`px-3 py-2.5 text-[12px] font-semibold bg-surface-2 border-b border-border whitespace-nowrap text-text-muted ${
                           i === 0 ? "text-start sticky-col z-20" : "text-end"
                         }`}
                         style={i === 0 ? { background: "var(--surface-2)", width: 200 } : undefined}

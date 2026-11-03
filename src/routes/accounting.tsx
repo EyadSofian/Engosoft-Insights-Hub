@@ -242,7 +242,7 @@ function Accounting() {
       sortValue: (row) => row.moveType,
       render: (row) =>
         row.isCreditNote ? (
-          <span className="inline-flex rounded-full bg-danger/10 px-2 py-1 text-xs font-semibold text-danger">
+          <span className="inline-flex rounded-full bg-danger/10 px-2 py-1 text-xs font-medium text-danger">
             {lang === "ar" ? "إلغاء / إشعار خصم" : "Cancellation / credit note"}
           </span>
         ) : (
@@ -451,7 +451,7 @@ function Accounting() {
           demand with their current values named on the closed summary. */}
       <details className="group card overflow-hidden">
         <summary className="flex min-h-12 cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-3.5 py-2.5 [&::-webkit-details-marker]:hidden sm:px-5">
-          <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-text">
+          <span className="inline-flex items-center gap-2 text-[13px] font-medium text-text">
             <CalendarDays size={16} className="text-brand" />
             {lang === "ar" ? "أساس التقرير ونطاق الشركة" : "Reporting basis and company scope"}
           </span>
@@ -478,7 +478,7 @@ function Accounting() {
         <div className="grid gap-4 border-t border-border p-3.5 sm:p-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(220px,.75fr)_auto] lg:items-end">
           {view !== "net-sales" && view !== "profitability" && (
             <div>
-              <div className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-text">
+              <div className="mb-2 inline-flex items-center gap-1.5 text-xs font-medium text-text">
                 <CalendarDays size={15} className="text-brand" />
                 {lang === "ar" ? "أساس تاريخ الحسابات" : "Accounting date basis"}
               </div>
@@ -505,7 +505,7 @@ function Accounting() {
           )}
 
           <label className="block">
-            <span className="mb-2 inline-flex items-center gap-1.5 text-xs font-semibold text-text">
+            <span className="mb-2 inline-flex items-center gap-1.5 text-xs font-medium text-text">
               <Building2 size={15} className="text-brand" />
               {view === "profitability"
                 ? lang === "ar"
@@ -628,12 +628,12 @@ function Accounting() {
                 <details className="group card overflow-hidden">
                   <summary className="flex min-h-12 cursor-pointer list-none items-center gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden sm:px-5">
                     <RotateCcw size={17} className="shrink-0 text-amber-600" aria-hidden="true" />
-                    <span className="text-[13px] font-semibold text-text">
+                    <span className="text-[13px] font-medium text-text">
                       {lang === "ar"
                         ? "إشعارات الخصم المنشورة في Odoo"
                         : "Posted Odoo credit notes"}
                     </span>
-                    <span className="num rounded-full bg-amber-50 px-2.5 py-1 text-[12px] font-semibold text-amber-700">
+                    <span className="num rounded-full bg-amber-50 px-2.5 py-1 text-[12px] font-medium text-amber-700">
                       {fmtNum(data.creditNoteReconciliation.documents.length)}
                     </span>
                     <ChevronDown
@@ -683,7 +683,7 @@ function Accounting() {
 
               <details className="group card overflow-hidden">
                 <summary className="flex min-h-12 cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-1 px-3.5 py-2.5 [&::-webkit-details-marker]:hidden sm:px-5">
-                  <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-text">
+                  <span className="inline-flex items-center gap-2 text-[13px] font-medium text-text">
                     <BadgeDollarSign size={16} className="text-brand" />
                     {lang === "ar" ? "أسعار التحويل والتصدير" : "Conversion rates and export"}
                   </span>
@@ -697,7 +697,7 @@ function Accounting() {
                         event.preventDefault();
                         setExportOpen(true);
                       }}
-                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-[12px] font-semibold text-text transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                      className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3 text-[12px] font-medium text-text transition-colors hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                     >
                       <Download size={15} />
                       {lang === "ar" ? "تصدير الحسابات كاملة" : "Export all Accounting"}
@@ -757,7 +757,7 @@ function Accounting() {
                         <button
                           type="button"
                           onClick={applyFxRates}
-                          className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-brand px-3 py-2 text-[12px] font-semibold text-white transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 sm:flex-none sm:px-4 sm:text-sm"
+                          className="inline-flex min-h-11 flex-1 items-center justify-center rounded-xl bg-brand px-3 py-2 text-[12px] font-medium text-white transition hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 sm:flex-none sm:px-4 sm:text-sm"
                         >
                           {lang === "ar" ? "تطبيق وإعادة الحساب" : "Apply and recalculate"}
                         </button>
@@ -1301,7 +1301,7 @@ function AccountingExportDialog({
       >
         <header className="flex items-start justify-between gap-4 border-b border-border px-4 py-4 sm:px-6">
           <div>
-            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-[12px] font-semibold text-success">
+            <div className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-success-soft px-2.5 py-1 text-[12px] font-medium text-success">
               <ShieldCheck size={14} />
               {lang === "ar" ? "الفواتير المدفوعة فقط" : "Paid invoices only"}
             </div>
@@ -1343,7 +1343,7 @@ function AccountingExportDialog({
                   <span className="mt-1 block text-xs leading-relaxed text-text-muted">
                     {option.description}
                   </span>
-                  <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-brand">
+                  <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-brand">
                     <FileSpreadsheet size={14} />
                     {lang === "ar" ? "تنزيل CSV كامل" : "Download full CSV"}
                   </span>

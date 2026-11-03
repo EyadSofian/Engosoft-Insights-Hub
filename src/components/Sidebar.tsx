@@ -7,6 +7,7 @@ import { NAVIGATION_SECTIONS, sectionIsActive, type NavigationSection } from "@/
 import { MoreReportsList, useLocationSearch } from "./MoreReports";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { EngosoftMark } from "./EngosoftMark";
+import { NexusLauncher } from "./engo-nexus/NexusLauncher";
 
 /**
  * The desktop navigation rail.
@@ -42,14 +43,10 @@ export function Sidebar() {
       }}
     >
       <div className="mb-5 flex items-center gap-2">
-        <Link to="/" className="group flex min-w-0 flex-1 items-center gap-2.5 px-1">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/14 text-white transition-transform duration-200 group-hover:scale-105">
-            <EngosoftMark className="h-7 w-7" />
-          </div>
+        <Link to="/" className="flex min-w-0 flex-1 items-center gap-2.5 px-1">
+          <EngosoftMark className="h-6 w-6 shrink-0 text-nav-text" />
           <div className="min-w-0 leading-tight">
-            <div className="engosoft-wordmark truncate text-[18px] text-nav-text">
-              engosoft
-            </div>
+            <div className="engosoft-wordmark truncate text-[17px] text-nav-text">engosoft</div>
             <div className="truncate text-[12px] text-nav-text-muted">{t("app_sub")}</div>
           </div>
         </Link>
@@ -85,15 +82,16 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-auto space-y-3 px-1 pt-6">
+      <div className="mt-auto space-y-1 px-1 pt-6">
+        <NexusLauncher />
         <Link
           to="/guide"
-          className="flex min-h-10 items-center gap-2.5 rounded-xl bg-white/15 px-3 text-[12px] font-semibold text-nav-text transition-colors hover:bg-white/25"
+          className="flex min-h-9 items-center gap-2.5 rounded-lg px-2.5 text-[13px] font-normal text-nav-text-muted transition-colors hover:bg-nav-hover hover:text-nav-text"
         >
           <BookOpen size={16} />
           <span>{lang === "ar" ? "دليل استخدام الداشبورد" : "Dashboard user guide"}</span>
         </Link>
-        <div className="px-3 text-[12px] text-nav-text-muted">
+        <div className="px-2.5 pt-2 text-[12px] text-nav-text-muted">
           © {new Date().getFullYear()} Engosoft
         </div>
       </div>
@@ -102,32 +100,31 @@ export function Sidebar() {
 }
 
 const railRowClass = (active: boolean) =>
-  `group relative flex min-h-11 w-full items-center gap-3 rounded-xl px-2.5 text-start text-[13.5px] font-semibold transition-colors duration-150 ${
+  `group relative flex min-h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-start text-[14px] font-normal transition-colors duration-150 ${
     active ? "" : "hover:bg-nav-hover"
   }`;
 
+/**
+ * The row you are on is a surface step with a cobalt tick, not a white pill
+ * with a violet shadow under it. The rail carries no data, so nothing on it
+ * should be the brightest thing on the screen.
+ */
 const railRowStyle = (active: boolean) =>
   active
     ? {
         background: "var(--nav-active-bg)",
         color: "var(--nav-active-text)",
-        boxShadow: "0 8px 20px -10px rgba(20, 10, 80, 0.55)",
+        boxShadow: "inset 2px 0 0 0 var(--brand)",
       }
-    : { color: "var(--nav-text)" };
+    : { color: "var(--nav-text-muted)" };
 
 function RailIcon({ section, active }: { section: NavigationSection; active: boolean }) {
   const Icon = section.icon;
+  // One icon box width in every row, so the labels start on one line. One size
+  // and one stroke, whether the row is active or not.
   return (
-    <span
-      className="grid size-8 shrink-0 place-items-center rounded-lg transition-colors"
-      style={
-        active
-          ? { background: "var(--nav-active-text)", color: "#fff" }
-          : { background: "rgba(255, 255, 255, 0.14)", color: "var(--nav-text)" }
-      }
-      aria-hidden="true"
-    >
-      <Icon size={17} strokeWidth={active ? 2.3 : 1.9} />
+    <span className="grid size-5 shrink-0 place-items-center" aria-hidden="true">
+      <Icon size={18} strokeWidth={1.5} color={active ? "var(--brand)" : "currentColor"} />
     </span>
   );
 }
@@ -164,7 +161,7 @@ function MoreMenuRow({ section, active }: { section: NavigationSection; active: 
         className="w-80 max-h-[80dvh] overflow-y-auto rounded-xl p-2"
         style={{ background: "var(--surface)", borderColor: "var(--border)" }}
       >
-        <div className="px-2.5 pb-1.5 pt-1 text-[12px] font-bold uppercase tracking-wide text-text-subtle">
+        <div className="px-2.5 pb-1.5 pt-1 text-[12px] font-medium text-text-subtle">
           {lang === "ar" ? "تقارير متخصصة" : "Specialist reports"}
         </div>
         <MoreReportsList onNavigate={() => setOpen(false)} />
@@ -188,7 +185,7 @@ function NavigationToggle() {
       onClick={() => chromeStore.setNavigationHidden(true)}
       aria-label={label}
       title={label}
-      className="grid h-9 w-9 shrink-0 cursor-pointer place-items-center rounded-lg border border-nav-border text-nav-text-muted transition-colors hover:bg-nav-hover hover:text-nav-text active:scale-[0.97]"
+      className="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-md border border-nav-border text-nav-text-muted transition-colors hover:bg-nav-hover hover:text-nav-text active:scale-[0.98]"
     >
       <PanelRightClose size={16} className="rtl:-scale-x-100" />
     </button>

@@ -81,7 +81,7 @@ function Change({
   if (value === null) return <span className="text-text-subtle">—</span>;
   const good = invert ? value <= 0 : value >= 0;
   return (
-    <span className={`num font-bold ${good ? "text-mint-ink" : "text-rose-ink"}`}>
+    <span className={`num font-medium ${good ? "text-mint-ink" : "text-rose-ink"}`}>
       {value > 0 ? "+" : ""}
       {fmtPct(value, 1)}
     </span>
@@ -115,8 +115,8 @@ function YearMetric({
           : "border-t-sky-strong";
   return (
     <Card className={`border-t-[3px] ${accent}`}>
-      <div className="text-xs font-semibold text-text-muted">{metricName(measure, lang)}</div>
-      <div className="num mt-2 text-2xl font-black tracking-tight text-text">
+      <div className="text-xs font-medium text-text-muted">{metricName(measure, lang)}</div>
+      <div className="num mt-2 text-2xl font-medium tracking-tight text-text">
         {currentAvailable ? moneyOrNumber(measure, current[measure]) : "—"}
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2 text-[12px]">
@@ -216,10 +216,10 @@ function YearlyPage() {
           <Card className="border-brand/20 bg-brand-soft/20">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
-                <div className="text-[12px] font-bold uppercase tracking-[0.12em] text-brand">
+                <div className="text-[12px] font-medium text-brand">
                   {A ? "نطاق المقارنة" : "Comparison window"}
                 </div>
-                <h2 className="mt-1 text-lg font-black text-text">
+                <h2 className="mt-1 text-lg font-medium text-text">
                   {annual.year}{" "}
                   <span className="font-medium text-text-muted">{A ? "مقابل" : "versus"}</span>{" "}
                   {annual.previousYear}
@@ -230,7 +230,7 @@ function YearlyPage() {
                 </p>
               </div>
               <div className="flex flex-wrap items-end gap-2">
-                <label className="text-[12px] font-semibold text-text-muted">
+                <label className="text-[12px] font-medium text-text-muted">
                   {A ? "السنة" : "Year"}
                   <select
                     value={annual.year}
@@ -247,7 +247,7 @@ function YearlyPage() {
                     ))}
                   </select>
                 </label>
-                <label className="text-[12px] font-semibold text-text-muted">
+                <label className="text-[12px] font-medium text-text-muted">
                   {A ? "حتى نهاية شهر" : "Through month"}
                   <select
                     value={annual.throughMonth}
@@ -281,7 +281,7 @@ function YearlyPage() {
             <Card className="border-sky-border bg-sky-surface/30">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-bold text-text">
+                  <div className="text-sm font-medium text-text">
                     {A ? "ليدز 2024 و2025 من Odoo" : "2024–2025 leads from Odoo"}
                   </div>
                   <p className="mt-1 text-xs leading-relaxed text-text-muted">
@@ -294,7 +294,7 @@ function YearlyPage() {
                   {data.history.map((source) => (
                     <span
                       key={source.year}
-                      className="rounded-full border border-border bg-surface px-3 py-1 text-[12px] font-semibold text-text"
+                      className="rounded-full border border-border bg-surface px-3 py-1 text-[12px] font-medium text-text"
                       title={
                         source.status === "ready"
                           ? `${source.year}: ${fmtNum(source.leads)} total Odoo leads · ${fmtNum(source.inventoryLeads)} Inventory · ${source.syncedAt}`
@@ -323,7 +323,7 @@ function YearlyPage() {
               <div className="flex gap-2">
                 <CircleAlert size={18} className="mt-0.5 shrink-0 text-amber-ink" />
                 <div>
-                  <div className="text-sm font-bold text-text">
+                  <div className="text-sm font-medium text-text">
                     {A
                       ? "مقارنة CRM بالسنة الماضية غير مكتملة"
                       : "Prior-year CRM comparison is incomplete"}
@@ -467,7 +467,7 @@ function YearlyPage() {
               >
                 {A ? "التحصيل مقابل الصرف" : "Collections versus spend"}
               </SectionTitle>
-              <div className="num text-3xl font-black text-text">
+              <div className="num text-3xl font-medium text-text">
                 {currentRevenueAvailable && currentSpendAvailable && annual.current.spend > 0
                   ? `${(annual.current.revenue / annual.current.spend).toFixed(2)}×`
                   : "—"}
@@ -541,7 +541,7 @@ function YearlyPage() {
                           {MONTHS[lang][row.month - 1]}
                         </td>
                         <td className="px-2 py-3 text-end">
-                          <div className="num font-bold text-text">
+                          <div className="num font-medium text-text">
                             {currentAvailable ? moneyOrNumber(monthlyMeasure, current) : "—"}
                           </div>
                           <div className="ms-auto mt-1 h-1.5 max-w-32 rounded-full bg-surface-3">
@@ -626,7 +626,7 @@ function YearlyPage() {
                       >
                         {row.name}
                       </td>
-                      <td className="num px-2 py-3 text-end font-bold text-text">
+                      <td className="num px-2 py-3 text-end font-medium text-text">
                         {currentRevenueAvailable ? fmtUSDFull(row.current.revenue) : "—"}
                       </td>
                       <td className="num px-2 py-3 text-end text-text-muted">
@@ -709,7 +709,7 @@ function Outcome({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-border bg-surface-2 p-3">
       <div className="text-[12px] text-text-muted">{label}</div>
-      <div className="num mt-1 text-lg font-black text-text">{value}</div>
+      <div className="num mt-1 text-lg font-medium text-text">{value}</div>
     </div>
   );
 }

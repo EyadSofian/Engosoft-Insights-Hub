@@ -655,10 +655,10 @@ export function ClosedLoopFunnel({
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           {(data?.funnel ?? []).map((step) => (
             <Card key={step.key} padded>
-              <div className="text-[12px] font-semibold text-text-muted">
+              <div className="text-[12px] font-medium text-text-muted">
                 {A ? FUNNEL_LABEL[step.key]?.ar : FUNNEL_LABEL[step.key]?.en}
               </div>
-              <div className="text-lg font-bold text-text">
+              <div className="text-lg font-medium text-text">
                 {step.value == null
                   ? "—"
                   : step.key === "revenue"
@@ -922,7 +922,7 @@ function identityColumns(
                 event.stopPropagation();
                 onOpenCreative(row.creativeId);
               }}
-              className="mt-0.5 block text-[12px] font-semibold text-brand hover:underline"
+              className="mt-0.5 block text-[12px] font-medium text-brand hover:underline"
             >
               {A ? "عرض المادة الإعلانية ←" : "View creative →"}
             </button>
@@ -1217,7 +1217,7 @@ export function GrainPerformance({
         row.crmMatched ? (
           <button
             type="button"
-            className="text-xs font-semibold text-brand hover:underline"
+            className="text-xs font-medium text-brand hover:underline"
             onClick={() =>
               onShowRecords({
                 campaignId: grain === "creative" ? undefined : row.campaignId,
@@ -1533,7 +1533,7 @@ export function LeadQuality({
       <div className="space-y-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <Card padded>
-            <div className="text-[12px] font-semibold text-text-muted">
+            <div className="text-[12px] font-medium text-text-muted">
               {A ? "أرخص عملاء (20 عميلًا على الأقل)" : "Cheapest leads (20+ leads)"}
             </div>
             <div className="truncate text-sm font-semibold text-text">{name(cheapest)}</div>
@@ -1543,7 +1543,7 @@ export function LeadQuality({
             </div>
           </Card>
           <Card padded>
-            <div className="text-[12px] font-semibold text-text-muted">
+            <div className="text-[12px] font-medium text-text-muted">
               {A ? "أفضل عملاء (جودة المبيعات)" : "Best leads (sales quality)"}
             </div>
             <div className="truncate text-sm font-semibold text-text">{name(bestQuality)}</div>
@@ -2053,7 +2053,7 @@ export function CreativeDetail({
           </div>
 
           <div>
-            <div className="mb-1 text-xs font-semibold text-text">
+            <div className="mb-1 text-xs font-medium text-text">
               {A ? "التسلسل: حملة ← مجموعة ← إعلان" : "Hierarchy: campaign → ad set → ad"}
             </div>
             <div className="space-y-1">
@@ -2071,7 +2071,7 @@ export function CreativeDetail({
           {/* Identifiers reconcile a row with Meta; a manager reading the
               creative's story does not need them in the way. */}
           <details className="group rounded-lg border border-border">
-            <summary className="cursor-pointer list-none px-3 py-2 text-xs font-semibold text-text-muted [&::-webkit-details-marker]:hidden">
+            <summary className="cursor-pointer list-none px-3 py-2 text-xs font-medium text-text-muted [&::-webkit-details-marker]:hidden">
               {A ? "تفاصيل تقنية" : "Technical details"}
             </summary>
             <div className="space-y-1 border-t border-border px-3 py-2 font-mono text-[12px] text-text-muted">
@@ -2093,7 +2093,7 @@ export function CreativeDetail({
           </details>
 
           <div>
-            <div className="mb-1 text-xs font-semibold text-text">
+            <div className="mb-1 text-xs font-medium text-text">
               {A ? "أداء الإعلان" : "Media performance"}
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -2108,7 +2108,7 @@ export function CreativeDetail({
           </div>
 
           <div>
-            <div className="mb-1 text-xs font-semibold text-text">
+            <div className="mb-1 text-xs font-medium text-text">
               {A ? "الاستحواذ وجودة العملاء" : "Acquisition and lead quality"}
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -2136,7 +2136,7 @@ export function CreativeDetail({
           </div>
 
           <div>
-            <div className="mb-1 text-xs font-semibold text-text">
+            <div className="mb-1 text-xs font-medium text-text">
               {A ? "المبيعات" : "Sales outcomes"}
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

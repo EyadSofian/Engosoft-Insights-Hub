@@ -78,7 +78,7 @@ export function CreativeGallery({
         <button
           type="button"
           onClick={onShowTable}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline"
+          className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline"
         >
           <Table2 size={13} aria-hidden />
           {A ? "عرض كجدول" : "Show as table"}
@@ -247,7 +247,9 @@ function Metric({ label, value, strong }: { label: string; value: string; strong
   return (
     <div className="min-w-0">
       <dt className="truncate text-text-muted">{label}</dt>
-      <dd className={`num truncate ${strong ? "font-bold text-text" : "font-semibold text-text"}`}>
+      <dd
+        className={`num truncate ${strong ? "font-medium text-text" : "font-semibold text-text"}`}
+      >
         {value}
       </dd>
     </div>

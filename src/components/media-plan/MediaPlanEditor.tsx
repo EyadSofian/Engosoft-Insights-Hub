@@ -153,7 +153,7 @@ export function MediaPlanEditor({
         className="w-full overflow-y-auto p-0 sm:max-w-5xl"
       >
         <SheetHeader className="border-b border-border bg-brand-soft/40 p-4 sm:p-6">
-          <div className="flex items-center gap-2 text-xs font-semibold text-brand">
+          <div className="flex items-center gap-2 text-xs font-medium text-brand">
             {mode === "create" ? <CopyPlus size={16} /> : <Save size={16} />}
             {mode === "create"
               ? lang === "ar"
@@ -163,7 +163,7 @@ export function MediaPlanEditor({
                 ? "تعديل الخطة"
                 : "Edit media plan"}
           </div>
-          <SheetTitle className="text-xl font-bold text-text">
+          <SheetTitle className="text-xl font-medium text-text">
             {lang === "ar" ? "محرر خطة الميديا" : "Media plan editor"}
           </SheetTitle>
           <SheetDescription>
@@ -271,7 +271,7 @@ export function MediaPlanEditor({
                 <div className="text-[12px] text-text-muted">
                   {lang === "ar" ? "إجمالي تارجت الليدز" : "Total lead target"}
                 </div>
-                <div className="num mt-1 text-lg font-bold text-text">
+                <div className="num mt-1 text-lg font-medium text-text">
                   {fmtNum(draft.paidLeadTarget + draft.organicWebinarLeadTarget)}
                 </div>
               </div>
@@ -313,7 +313,7 @@ export function MediaPlanEditor({
                     ],
                   }))
                 }
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-semibold text-brand"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-medium text-brand"
               >
                 <CirclePlus size={14} /> {lang === "ar" ? "أضف دورة" : "Add course"}
               </button>
@@ -437,7 +437,7 @@ export function MediaPlanEditor({
                     ],
                   }))
                 }
-                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-semibold text-brand"
+                className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-medium text-brand"
               >
                 <CirclePlus size={14} /> {lang === "ar" ? "أضف نشاط" : "Add activity"}
               </button>
@@ -698,7 +698,7 @@ function EditorSection({
   return (
     <section>
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-sm font-bold text-text">{title}</h3>
+        <h3 className="text-sm font-medium text-text">{title}</h3>
         {action}
       </div>
       {children}
@@ -759,7 +759,7 @@ function Summary({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/[.06] p-3">
       <div className="text-[12px] text-white/55">{label}</div>
-      <div className="num mt-1 text-base font-bold">{value}</div>
+      <div className="num mt-1 text-base font-medium">{value}</div>
     </div>
   );
 }

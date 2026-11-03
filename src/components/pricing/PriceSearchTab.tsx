@@ -262,7 +262,7 @@ function CourseCard({ entry }: { entry: CatalogEntry }) {
                 </Pill>
                 <Pill tone="neutral">{deliveryLabel(entry.deliveryType, lang)}</Pill>
               </div>
-              <h3 className="line-clamp-2 text-[14px] font-bold leading-snug text-text">
+              <h3 className="line-clamp-2 text-[14px] font-medium leading-snug text-text">
                 {entry.courseName}
               </h3>
               <p className="mt-1 text-[12px] text-text-muted">
@@ -275,18 +275,18 @@ function CourseCard({ entry }: { entry: CatalogEntry }) {
 
         <div className="mt-5 grid grid-cols-2 gap-2">
           <div className="rounded-xl bg-surface-2 px-3 py-2.5">
-            <div className="text-[12px] font-semibold text-text-muted">
+            <div className="text-[12px] font-medium text-text-muted">
               {lang === "ar" ? "كاش" : "Cash"}
             </div>
-            <div className="mt-1 text-[14px] font-bold tabular-nums text-text">
+            <div className="mt-1 text-[14px] font-medium tabular-nums text-text">
               {cash ? bandText(cash, lang) : "—"}
             </div>
           </div>
           <div className="rounded-xl bg-brand-soft/45 px-3 py-2.5">
-            <div className="text-[12px] font-semibold text-text-muted">
+            <div className="text-[12px] font-medium text-text-muted">
               {lang === "ar" ? "تابي / تمارا" : "Tabby / Tamara"}
             </div>
-            <div className="mt-1 text-[14px] font-bold tabular-nums text-brand">
+            <div className="mt-1 text-[14px] font-medium tabular-nums text-brand">
               {instalment ? bandText(instalment, lang) : "—"}
             </div>
           </div>
@@ -327,7 +327,7 @@ function CourseCard({ entry }: { entry: CatalogEntry }) {
             </Pill>
           )}
         </div>
-        <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-[12px] font-bold text-brand">
+        <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-[12px] font-medium text-brand">
           <span>
             {open
               ? lang === "ar"
@@ -346,7 +346,7 @@ function CourseCard({ entry }: { entry: CatalogEntry }) {
           {groups.map((group) => (
             <div key={group.scope} className="rounded-xl bg-surface px-3 first:mt-0 [&+&]:mt-2">
               {group.scope !== "individual" && (
-                <p className="pt-2 text-[12px] font-semibold uppercase tracking-wide text-text-subtle">
+                <p className="pt-2 text-[12px] font-medium text-text-subtle">
                   {scopeLabel(group.scope, lang)}
                 </p>
               )}
@@ -440,7 +440,7 @@ export function PriceSearchTab({
           </div>
           <button
             type="submit"
-            className="inline-flex min-h-12 shrink-0 cursor-pointer items-center justify-center rounded-xl px-5 text-[13px] font-semibold text-white transition hover:brightness-110"
+            className="inline-flex min-h-12 shrink-0 cursor-pointer items-center justify-center rounded-xl px-5 text-[13px] font-medium text-white transition hover:brightness-110"
             style={{ background: "var(--brand)" }}
           >
             {lang === "ar" ? "بحث" : "Search"}
@@ -451,7 +451,7 @@ export function PriceSearchTab({
           <button
             type="button"
             onClick={() => setShowFilters((value) => !value)}
-            className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-border px-3 text-[12px] font-semibold text-text hover:bg-surface-2"
+            className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-border px-3 text-[12px] font-medium text-text hover:bg-surface-2"
           >
             <SlidersHorizontal size={15} aria-hidden="true" />
             {lang === "ar" ? "فلترة متقدمة" : "Advanced filters"}
@@ -551,9 +551,9 @@ export function PriceSearchTab({
       {!loading &&
         grouped.map(([specialization, entries]) => (
           <section key={specialization} className="space-y-2">
-            <h2 className="flex items-center gap-2 text-[13px] font-semibold text-text-muted">
+            <h2 className="flex items-center gap-2 text-[13px] font-medium text-text-muted">
               {specializationLabel(specialization, lang)}
-              <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[12px] font-bold tabular-nums text-text-subtle">
+              <span className="rounded-full bg-surface-2 px-2 py-0.5 text-[12px] font-medium tabular-nums text-text-subtle">
                 {entries.length}
               </span>
             </h2>
