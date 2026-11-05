@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { json } from "@/lib/api.server";
+import { acquisitionDateFilters } from "@/lib/acquisition-reporting-period";
 
 /**
  * Acquisition performance by campaign, ad set, ad, creative, landing page and
@@ -14,8 +15,7 @@ export const Route = createFileRoute("/api/acquisition/performance")({
         const { getAcquisitionPerformance } = await import("@/lib/acquisition-performance.server");
         return json(
           await getAcquisitionPerformance({
-            from: params.get("from") || undefined,
-            to: params.get("to") || undefined,
+            ...acquisitionDateFilters(params),
           }),
         );
       },

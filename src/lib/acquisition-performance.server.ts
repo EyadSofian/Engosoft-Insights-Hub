@@ -10,6 +10,8 @@ import {
 } from "./acquisition-attribution.server";
 import { summarizeAcquisitionGroups, type AcquisitionGroup } from "./acquisition-attribution";
 import { TRACKED_LANDING_PAGES } from "./landing-pages";
+import { resolveAcquisitionReportingPeriod } from "./acquisition-reporting-period.server";
+import type { AcquisitionDateFilters } from "./acquisition-reporting-period";
 import {
   PERFORMANCE_GRAINS,
   confidenceBucket,
@@ -32,7 +34,6 @@ import {
 
 type Row = Record<string, unknown>;
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const n = (value: unknown): number => Number(value ?? 0) || 0;
 const s = (value: unknown): string => (value == null ? "" : String(value));
 
@@ -57,13 +58,6 @@ export function businessToday(now = new Date()): string {
     month: "2-digit",
     day: "2-digit",
   }).format(now);
-}
-
-function resolveRange(from?: string, to?: string): { from: string; to: string } {
-  const today = businessToday();
-  const end = to && DATE.test(to) ? to : today;
-  const start = from && DATE.test(from) ? from : `${end.slice(0, 7)}-01`;
-  return start <= end ? { from: start, to: end } : { from: end, to: start };
 }
 
 /** Synced Meta ad rows in the window, one row per ad per day. */
@@ -634,9 +628,9 @@ type AcquisitionPerformance = Awaited<ReturnType<typeof computeAcquisitionPerfor
 const CACHE_TTL_MS = 60_000;
 const cache = new Map<string, { at: number; value: Promise<AcquisitionPerformance> }>();
 
-export async function getAcquisitionPerformance(filters: { from?: string; to?: string } = {}) {
+export async function getAcquisitionPerformance(filters: AcquisitionDateFilters = {}) {
   if (!acquisitionDatabaseConfigured()) return { configured: false as const };
-  const range = resolveRange(filters.from, filters.to);
+  const range = await resolveAcquisitionReportingPeriod(filters);
   const key = `${range.from}|${range.to}|${businessToday()}`;
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value;

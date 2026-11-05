@@ -1,4 +1,6 @@
 import { createHash } from "node:crypto";
+import { resolveAcquisitionReportingPeriod } from "./acquisition-reporting-period.server";
+import type { AcquisitionDateFilters } from "./acquisition-reporting-period";
 import {
   BUSINESS_TIME_ZONE,
   acquisitionDatabaseConfigured,
@@ -69,7 +71,6 @@ import {
 
 type Row = Record<string, unknown>;
 
-const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const s = (value: unknown): string => (value == null ? "" : String(value).trim());
 const text = s;
 const obj = (value: unknown): Row =>
@@ -1072,21 +1073,6 @@ function cached<T>(key: string, compute: () => Promise<T>): Promise<T> {
   return value;
 }
 
-function businessToday(): string {
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: BUSINESS_TIME_ZONE,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
-}
-
-function resolveRange(from?: string, to?: string) {
-  const end = to && DATE.test(to) ? to : businessToday();
-  const start = from && DATE.test(from) ? from : `${end.slice(0, 7)}-01`;
-  return start <= end ? { from: start, to: end } : { from: end, to: start };
-}
-
 interface FactRecord extends AcquisitionFactRow {
   sourceType: string;
   occurredAt: string;
@@ -1481,6 +1467,7 @@ async function loadScopeTotals(
 }
 
 export interface ClosedLoopFilters {
+  range?: "all";
   from?: string;
   to?: string;
   platform?: string;
@@ -1491,7 +1478,7 @@ export interface ClosedLoopFilters {
 
 export async function getClosedLoop(filters: ClosedLoopFilters = {}) {
   if (!acquisitionDatabaseConfigured()) return { configured: false as const };
-  const range = resolveRange(filters.from, filters.to);
+  const range = await resolveAcquisitionReportingPeriod(filters);
   const scope = managementScopeFrom(filters);
   const exactOk = exactAttributionAvailable(scope);
   const fxFilters = { fxEgp: filters.fxEgp, fxSar: filters.fxSar };
@@ -2115,14 +2102,11 @@ function outcomeRecord(fact: FactRecord) {
 }
 
 /** Everything about one creative: media, hierarchy, spend, acquisitions, quality and sales. */
-export async function getCreativeDetail(
-  creativeId: string,
-  filters: { from?: string; to?: string } = {},
-) {
+export async function getCreativeDetail(creativeId: string, filters: AcquisitionDateFilters = {}) {
   if (!acquisitionDatabaseConfigured()) return { configured: false as const };
   const id = s(creativeId);
   if (!/^[\w.:-]{1,64}$/.test(id)) return { configured: true as const, found: false as const };
-  const range = resolveRange(filters.from, filters.to);
+  const range = await resolveAcquisitionReportingPeriod(filters);
   return cached(`creative|${id}|${range.from}|${range.to}`, async () => {
     await ensureClosedLoopSchema();
     const pool = getPool();

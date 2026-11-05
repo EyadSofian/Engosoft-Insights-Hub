@@ -9,11 +9,13 @@ import {
   ArrowDown,
   Columns3,
   Check,
+  X,
 } from "lucide-react";
 import { useI18n } from "@/lib/i18n";
 import { EmptyState } from "./ui-bits";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { exportCsv } from "@/lib/csv";
+import { tableSearchMatcher } from "@/lib/table-search";
 
 export interface Col<T> {
   key: string;
@@ -172,8 +174,8 @@ export function DataTable<T>({
   const filtered = useMemo(() => {
     let out = rows;
     if (q && searchable) {
-      const nq = q.trim().toLowerCase();
-      out = out.filter((r) => searchable(r).toLowerCase().includes(nq));
+      const matches = tableSearchMatcher(q);
+      out = out.filter((r) => matches(searchable(r)));
     }
     if (sortKey && !serverSort) {
       const col = cols.find((c) => c.key === sortKey);
@@ -246,6 +248,16 @@ export function DataTable<T>({
               aria-label={t("search")}
               className="flex-1 bg-transparent text-sm outline-none py-2 min-w-0"
             />
+            {q && (
+              <button
+                type="button"
+                onClick={() => setQ("")}
+                aria-label={lang === "ar" ? "مسح البحث" : "Clear search"}
+                className="grid size-8 shrink-0 place-items-center rounded-lg text-text-muted hover:bg-surface"
+              >
+                <X size={14} aria-hidden="true" />
+              </button>
+            )}
           </div>
         )}
         {toolbar}

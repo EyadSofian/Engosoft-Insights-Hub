@@ -1,4 +1,5 @@
 import { useFilters } from "@/lib/filter-store";
+import { useI18n } from "@/lib/i18n";
 
 /**
  * The selected reporting window, as one readable string.
@@ -9,5 +10,7 @@ import { useFilters } from "@/lib/filter-store";
  */
 export function useReportingPeriod(): string | undefined {
   const filters = useFilters();
+  const { lang } = useI18n();
+  if (filters.range === "all") return lang === "ar" ? "كل الفترات" : "All time";
   return filters.from && filters.to ? `${filters.from} → ${filters.to}` : undefined;
 }

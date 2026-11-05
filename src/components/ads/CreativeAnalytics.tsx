@@ -9,6 +9,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useApi } from "@/lib/use-api";
+import { tableSearchMatcher } from "@/lib/table-search";
 import { fmtNum, fmtPct, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import {
   Card,
@@ -101,14 +102,21 @@ export function CreativeAnalytics({ selected }: { selected?: AcquisitionChannel 
   const [review, setReview] = useState("all");
 
   const rows = useMemo(() => {
-    const normalizedQuery = query.trim().toLocaleLowerCase();
+    const matchesSearch = tableSearchMatcher(query);
     const matched = (data?.rows ?? []).filter((row) => {
       if (review !== "all" && row.reviewStatus !== review) return false;
-      if (!normalizedQuery) return true;
-      return [row.headline, row.body, row.ad, row.campaign, row.adset, row.landingPageUrl]
-        .join(" ")
-        .toLocaleLowerCase()
-        .includes(normalizedQuery);
+      return matchesSearch(
+        [
+          row.headline,
+          row.body,
+          row.ad,
+          row.adId,
+          row.creativeId,
+          row.campaign,
+          row.adset,
+          row.landingPageUrl,
+        ].join(" "),
+      );
     });
     return sortRows(focusRows(matched, focus), sort, focus);
   }, [data?.rows, focus, query, review, sort]);

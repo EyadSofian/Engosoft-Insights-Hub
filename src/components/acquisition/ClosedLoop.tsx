@@ -35,6 +35,8 @@ import type {
 import { kpiDisplay } from "./ManagementOverview";
 import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
+import { filterStore, useFilters } from "@/lib/filter-store";
+import { useReportingPeriod } from "@/lib/use-reporting-period";
 import { AdVariantBreakdown } from "./AdVariantBreakdown";
 
 /**
@@ -947,6 +949,9 @@ export function CreativeAdsTable({
 }) {
   const { lang } = useI18n();
   const A = lang === "ar";
+  const filters = useFilters();
+  const period = useReportingPeriod();
+  const [search, setSearch] = useState("");
   const [onlyWithAcquisitions, setOnlyWithAcquisitions] = useState(false);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const rows = groupAdsByName(data?.grains?.ad ?? []).filter(
@@ -1080,6 +1085,38 @@ export function CreativeAdsTable({
         </label>
         <DataTable
           rows={rows}
+          search={search}
+          onSearchChange={setSearch}
+          belowToolbar={
+            <p className="px-4 py-2 text-xs text-text-muted">
+              {A
+                ? `البحث في كل إعلانات الفترة المختارة: ${period || "الشهر الحالي"}. اختلاف الشرطات والمسافات لا يمنع المطابقة.`
+                : `Searches all ads in the selected period: ${period || "Month to date"}. Spaces and dashes do not need to match.`}
+            </p>
+          }
+          emptyState={
+            <div className="px-4 py-8 text-center">
+              <p className="text-sm font-semibold">
+                {A
+                  ? "لا توجد إعلانات مطابقة داخل الفترة المختارة"
+                  : "No matching ads in the selected period"}
+              </p>
+              <p className="mt-2 text-xs text-text-muted">
+                {A
+                  ? "ابحث بجزء من الاسم أو رقم الإعلان، أو وسّع الفترة. هذا لا يعني أن الإعلان غير موجود في المنصة."
+                  : "Try part of the name or an Ad ID, or widen the period. This does not prove the ad is absent from the platform."}
+              </p>
+              {filters.range !== "all" && (
+                <button
+                  type="button"
+                  onClick={() => filterStore.setPreset("all")}
+                  className="mt-4 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white"
+                >
+                  {A ? "ابحث في كل الفترات بنفس النص" : "Search all time with this text"}
+                </button>
+              )}
+            </div>
+          }
           cols={cols}
           loading={loading}
           defaultVisibleLimit={9}

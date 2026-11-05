@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { json } from "@/lib/api.server";
+import { acquisitionDateFilters } from "@/lib/acquisition-reporting-period";
 
 /**
  * Closed-loop Marketing → Sales performance: acquisitions joined to CRM
@@ -18,8 +19,7 @@ export const Route = createFileRoute("/api/acquisition/closed-loop")({
         const { getClosedLoop } = await import("@/lib/closed-loop.server");
         return json(
           await getClosedLoop({
-            from: params.get("from") || undefined,
-            to: params.get("to") || undefined,
+            ...acquisitionDateFilters(params),
             platform: params.get("platform") || undefined,
             channel: params.get("channel") || undefined,
             fxEgp: params.get("fxEgp") || undefined,
