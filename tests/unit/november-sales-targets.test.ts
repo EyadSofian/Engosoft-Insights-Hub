@@ -80,6 +80,12 @@ describe("AAA.xlsx November publication", () => {
     expect(result.target).toBe(139500);
     expect(result.paidRevenue).toBe(1000);
   });
+  it("counts each stable employee identity once even if activity has aliases", () => {
+    const rows = members("2026-11");
+    const result = buildTargetUnitRollup([...rows, { ...rows[0], key: "another-alias" }]);
+    expect(result.target).toBe(139500);
+    expect(result.units.flatMap((u) => u.leaders.flatMap((l) => l.members))).toHaveLength(23);
+  });
   it("supersedes only pre-publication November edits and accepts later changes", () => {
     const base = {
       month: "2026-11",

@@ -173,6 +173,9 @@ function totals(members: TargetUnitMember[]) {
 }
 
 export function buildTargetUnitRollup(input: TargetUnitMemberInput[]) {
+  // Preserve the existing stable-ID deduplication: aliases must never publish
+  // the same person's quota twice in a team total.
+  input = [...new Map(input.map((member) => [member.employeeId, member])).values()];
   const assigned = new Set<string>();
 
   const units: TargetUnitRollup[] = TARGET_UNIT_LAYOUT.map((unit) => {

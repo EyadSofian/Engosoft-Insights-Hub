@@ -1499,8 +1499,10 @@ function buildTargetCoverage(
   for (const person of byName.values()) {
     if (seenUnmatched.has(person.entry.employeeId)) continue;
     seenUnmatched.add(person.entry.employeeId);
-    // An employee the workbook deliberately leaves untargeted is not missing.
-    if (person.monthly.every((month) => month.target === null)) continue;
+    // A historic quota is not a missing employee in a month whose workbook
+    // deliberately leaves this person untargeted.
+    const target = windowTarget(person.monthly, filters.from, filters.to).target;
+    if (target === null) continue;
     const found = [person.entry.name, ...person.entry.aliases].some((name) =>
       knownNames.has(normalizePersonName(name)),
     );
@@ -1510,7 +1512,7 @@ function buildTargetCoverage(
       employeeId: person.entry.employeeId,
       name: rosterEntry.name,
       teamLeader: rosterEntry.teamLeader,
-      target: windowTarget(person.monthly, filters.from, filters.to).target,
+      target,
     });
   }
 
