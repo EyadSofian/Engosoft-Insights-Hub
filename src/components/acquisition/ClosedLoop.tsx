@@ -37,6 +37,7 @@ import { fmtNum, fmtPct, fmtUSD, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
 import { filterStore, useFilters } from "@/lib/filter-store";
 import { useReportingPeriod } from "@/lib/use-reporting-period";
+import { searchTerms } from "@/lib/table-search";
 import { AdVariantBreakdown } from "./AdVariantBreakdown";
 
 /**
@@ -954,9 +955,16 @@ export function CreativeAdsTable({
   const [search, setSearch] = useState("");
   const [onlyWithAcquisitions, setOnlyWithAcquisitions] = useState(false);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
-  const rows = groupAdsByName(data?.grains?.ad ?? []).filter(
+  const groupedRows = groupAdsByName(data?.grains?.ad ?? []).filter(
     (row) => !onlyWithAcquisitions || row.leads > 0,
   );
+  // A complete ad name is stronger evidence than incidental matches in a
+  // campaign, ad set, or another variant's ID. Keep metadata search as fallback.
+  const normalizedName = searchTerms(search).join(" ");
+  const exactNames = normalizedName
+    ? groupedRows.filter((row) => searchTerms(row.adName).join(" ") === normalizedName)
+    : [];
+  const rows = exactNames.length ? exactNames : groupedRows;
   const spendAvailable = data?.kpis?.metaSpend ? data.kpis.metaSpend.status === "ok" : true;
   const pending = A ? "بانتظار المزامنة" : "Pending sync";
   const cols: Col<AdNameGroup<CreativeGrainRow>>[] = [

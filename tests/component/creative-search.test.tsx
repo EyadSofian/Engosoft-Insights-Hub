@@ -35,6 +35,35 @@ afterEach(() => {
   filterStore.reset();
 });
 describe("creative table search", () => {
+  it("prefers the complete ad name over incidental matches in another campaign", () => {
+    const original = response.grains!.ad[0];
+    const data: ClosedLoopResponse = {
+      ...response,
+      grains: {
+        ...response.grains!,
+        ad: [
+          original,
+          {
+            ...original,
+            key: "ad:2",
+            adId: "12000002",
+            adName: "PMP-Ad2-20-July 25",
+            campaignName: "PMP-Ad1-20-July 25",
+          },
+        ],
+      },
+    };
+    render(
+      <I18nProvider>
+        <CreativeAdsTable data={data} loading={false} onOpenCreative={() => {}} />
+      </I18nProvider>,
+    );
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "pmp_ad 1_20_jul_25" } });
+    expect(screen.getByText("PMP-Ad1-20-July 25")).toBeTruthy();
+    expect(screen.queryByText("PMP-Ad2-20-July 25")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(screen.getByText("PMP-Ad2-20-July 25")).toBeTruthy();
+  });
   it("finds the example by normalized name or ID and can clear search", () => {
     render(
       <I18nProvider>

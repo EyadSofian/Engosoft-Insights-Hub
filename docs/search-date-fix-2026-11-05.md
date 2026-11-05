@@ -16,6 +16,7 @@
 - Display All time / كل الفترات consistently in page headers.
 - Normalize table searches for case, punctuation, Arabic/Persian digits, and letter/digit spacing. All entered terms are required; short numeric terms must match a token, so Ad2 does not match a date containing 20.
 - Preserve displayed names, grouping keys and metric calculations.
+- A complete normalized ad-name match takes precedence over incidental matches in other campaigns/ad sets; metadata and ID search remain available when no full name matches.
 - Show the selected search scope, a clear button and an explicit user-controlled action to search all available periods without losing the query.
 
 ## Scope
