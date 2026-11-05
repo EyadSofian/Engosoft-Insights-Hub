@@ -1,3 +1,5 @@
+import { normalizePersonName } from "./person-name.ts";
+
 /**
  * The September sales organisation supplied by management.
  *
@@ -78,11 +80,44 @@ export interface TargetUnitMemberInput {
   target: number | null;
   paidRevenue: number;
   orderRevenue: number | null;
+  /** Published assignment for the selected window, not the latest org chart. */
+  teamLeader?: string;
+  supervisor?: string;
+  /** No matched activity row. Keep the quota, but do not invent performance. */
+  rosterOnly?: boolean;
 }
 
 export interface TargetUnitMember extends TargetUnitMemberInput {
   achievement: number | null;
   remaining: number | null;
+}
+
+export interface TargetRosterAssignment {
+  employeeId: string;
+  name: string;
+  teamLeader: string;
+  supervisor: string;
+  target: number;
+}
+
+/** A person with no activity must not disappear with their published quota. */
+export function includeTargetRoster(
+  activity: TargetUnitMemberInput[],
+  roster: TargetRosterAssignment[] = [],
+): TargetUnitMemberInput[] {
+  const present = new Set(activity.map((row) => row.employeeId));
+  return [
+    ...activity,
+    ...roster
+      .filter((row) => !present.has(row.employeeId))
+      .map((row) => ({
+        ...row,
+        key: `roster:${row.employeeId}`,
+        paidRevenue: 0,
+        orderRevenue: null,
+        rosterOnly: true,
+      })),
+  ];
 }
 
 export interface TargetLeaderRollup {
@@ -138,14 +173,43 @@ function totals(members: TargetUnitMember[]) {
 }
 
 export function buildTargetUnitRollup(input: TargetUnitMemberInput[]) {
-  const byEmployeeId = new Map(input.map((member) => [member.employeeId, member]));
   const assigned = new Set<string>();
 
   const units: TargetUnitRollup[] = TARGET_UNIT_LAYOUT.map((unit) => {
-    const leaders: TargetLeaderRollup[] = unit.leaders.map((leader) => {
-      const members = leader.employeeIds
-        .map((employeeId) => byEmployeeId.get(employeeId))
-        .filter((member): member is TargetUnitMemberInput => Boolean(member))
+    const definitions: {
+      key: string;
+      nameAr: string;
+      nameEn: string;
+      employeeIds: readonly string[];
+    }[] = [...unit.leaders];
+    if (unit.key === "asmaa" && input.some((member) => member.teamLeader === "Nader Aziz Resale")) {
+      definitions.splice(1, 0, {
+        key: "nader-aziz-resale",
+        nameAr: "فريق نادر عزيز — إعادة البيع",
+        nameEn: "Nader Aziz Resale Team",
+        employeeIds: [],
+      });
+    }
+    const normalized = (value: string) => normalizePersonName(value).replace(/ramdan/g, "ramadan");
+    const expectedSupervisor = unit.key === "bahaa" ? "Bahaa Ramadan" : "Asmaa Fathy";
+    const leaders: TargetLeaderRollup[] = definitions.map((leader) => {
+      const expectedLeader =
+        leader.key === "bahaa-ramadan"
+          ? "Bahaa Ramadan"
+          : leader.key === "ahmed-saeed"
+            ? "Ahmed Saeed"
+            : leader.key === "nader-aziz"
+              ? "Nader Aziz"
+              : leader.key === "nader-aziz-resale"
+                ? "Nader Aziz Resale"
+                : "Asmaa Fathy";
+      const members = input
+        .filter((member) =>
+          member.teamLeader !== undefined
+            ? normalized(member.teamLeader) === normalized(expectedLeader) &&
+              normalized(member.supervisor || "") === normalized(expectedSupervisor)
+            : leader.employeeIds.includes(member.employeeId),
+        )
         .map((member) => {
           assigned.add(member.employeeId);
           return memberRollup(member);
@@ -157,7 +221,7 @@ export function buildTargetUnitRollup(input: TargetUnitMemberInput[]) {
   });
 
   const standalone = STANDALONE_TARGET_EMPLOYEE_IDS.map((employeeId) =>
-    byEmployeeId.get(employeeId),
+    input.find((member) => member.employeeId === employeeId),
   )
     .filter((member): member is TargetUnitMemberInput => Boolean(member))
     .map((member) => {

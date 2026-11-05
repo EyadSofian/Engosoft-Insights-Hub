@@ -77,6 +77,7 @@ import type {
 import type { CallsHubCall, CallsHubEmployeeCalls } from "@/lib/calls-hub.server";
 import {
   buildTargetUnitRollup,
+  includeTargetRoster,
   isTargetUnitEmployee,
   type TargetLeaderRollup,
   type TargetUnitMember,
@@ -1108,21 +1109,27 @@ export function AccountingAgentsView() {
     );
   const selectedAgent = data.agents.find((row) => row.key === selectedAgentKey) ?? null;
   const targetUnitRollup = buildTargetUnitRollup(
-    data.agents
-      .filter(
-        (row): row is AgentRow & { target: AgentTarget } =>
-          row.target !== null &&
-          row.target !== undefined &&
-          (row.target.target !== null || isTargetUnitEmployee(row.target.employeeId)),
-      )
-      .map((row) => ({
-        key: row.key,
-        employeeId: row.target.employeeId,
-        name: row.displayName,
-        target: row.target.target,
-        paidRevenue: row.paidRevenue,
-        orderRevenue: row.orderRevenue,
-      })),
+    includeTargetRoster(
+      data.agents
+        .filter(
+          (row): row is AgentRow & { target: AgentTarget } =>
+            row.target !== null &&
+            row.target !== undefined &&
+            (row.target.target !== null ||
+              (row.target.teamLeader !== "" && isTargetUnitEmployee(row.target.employeeId))),
+        )
+        .map((row) => ({
+          key: row.key,
+          employeeId: row.target.employeeId,
+          name: row.displayName,
+          target: row.target.target,
+          paidRevenue: row.paidRevenue,
+          orderRevenue: row.orderRevenue,
+          teamLeader: row.target.teamLeader,
+          supervisor: row.target.supervisor,
+        })),
+      data.targets.roster,
+    ),
   );
 
   const selectMonth = (month: string) => {
@@ -2407,17 +2414,24 @@ function TargetLeaderCard({
               key={member.employeeId}
               type="button"
               onClick={() => onSelectEmployee(member.key)}
+              disabled={member.rosterOnly}
               className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-start transition-colors hover:border-brand/20 hover:bg-brand-soft"
             >
               <span className="min-w-0">
                 <span className="block truncate text-xs font-bold text-text">{member.name}</span>
                 <span className="mt-0.5 block text-[12px] text-text-subtle">
-                  {lang === "ar" ? "افتح أداء الموظف" : "Open employee performance"}
+                  {member.rosterOnly
+                    ? lang === "ar"
+                      ? "لا يوجد سجل نشاط مطابق في النطاق؛ التارجت محفوظ"
+                      : "No matching activity in scope; quota retained"
+                    : lang === "ar"
+                      ? "افتح أداء الموظف"
+                      : "Open employee performance"}
                 </span>
               </span>
               <span className="text-end">
                 <span className="block text-xs font-black text-text">
-                  {fmtUSDFull(member.paidRevenue)}
+                  {member.rosterOnly ? "—" : fmtUSDFull(member.paidRevenue)}
                 </span>
                 <span className="block text-[12px] text-text-subtle">
                   {member.target === null
@@ -2428,7 +2442,7 @@ function TargetLeaderCard({
                 </span>
               </span>
               <Pill tone={memberAchievementTone(member.achievement)}>
-                {fmtPct(member.achievement, 1)}
+                {member.rosterOnly ? "—" : fmtPct(member.achievement, 1)}
               </Pill>
             </button>
           ))}

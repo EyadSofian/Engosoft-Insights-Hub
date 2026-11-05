@@ -497,6 +497,63 @@ SALES_TARGETS["2026-10"] = [
     })),
 ];
 
+// AAA.xlsx, Sheet1 A1:D28, received 2026-11-05. Names resolve only through
+// the already verified October employee IDs/aliases, never fuzzy matching.
+// 23 published people; 54,000 + 26,500 + 45,000 + 8,000 + 6,000 = 139,500 USD.
+const NOVEMBER_PLAN: [string, number, string, string][] = [
+  ["338", 9000, "Bahaa Ramadan", "Bahaa Ramadan"],
+  ["346", 9000, "Bahaa Ramadan", "Bahaa Ramadan"],
+  ["606", 9000, "Bahaa Ramadan", "Bahaa Ramadan"],
+  ["503", 9000, "Bahaa Ramadan", "Bahaa Ramadan"],
+  ["482", 9000, "Bahaa Ramadan", "Bahaa Ramadan"],
+  ["238", 9000, "Bahaa Ramadan", "Bahaa Ramadan"],
+  ["630", 9000, "Ahmed Saeed", "Bahaa Ramadan"],
+  ["602", 7500, "Ahmed Saeed", "Bahaa Ramadan"],
+  ["635", 6000, "Ahmed Saeed", "Bahaa Ramadan"],
+  ["sara.abdullah@engosoft.com", 2000, "Ahmed Saeed", "Bahaa Ramadan"],
+  ["workbook:radwa-samah", 2000, "Ahmed Saeed", "Bahaa Ramadan"],
+  ["558", 9000, "Nader Aziz", "Asmaa Fathy"],
+  ["632", 9000, "Nader Aziz", "Asmaa Fathy"],
+  ["619", 7500, "Nader Aziz", "Asmaa Fathy"],
+  ["631", 7500, "Nader Aziz", "Asmaa Fathy"],
+  ["597", 6000, "Nader Aziz", "Asmaa Fathy"],
+  ["235", 6000, "Nader Aziz", "Asmaa Fathy"],
+  ["292", 4000, "Nader Aziz Resale", "Asmaa Fathy"],
+  ["378", 4000, "Nader Aziz Resale", "Asmaa Fathy"],
+  ["workbook:ahmed-salah-aboyazed", 2000, "Asmaa Fathy", "Asmaa Fathy"],
+  ["workbook:abdelrahman-abdelhamid", 2000, "Asmaa Fathy", "Asmaa Fathy"],
+  ["workbook:solaf-ali", 2000, "Asmaa Fathy", "Asmaa Fathy"],
+  ["335", 0, "Asmaa Fathy", "Asmaa Fathy"],
+];
+const novemberIds = new Set(NOVEMBER_PLAN.map(([id]) => id));
+const octoberById = new Map(SALES_TARGETS["2026-10"].map((row) => [row.employeeId, row]));
+SALES_TARGETS["2026-11"] = [
+  ...NOVEMBER_PLAN.map(([employeeId, target, teamLeader, supervisor]): SalesTarget => {
+    const previous = octoberById.get(employeeId);
+    if (!previous) throw new Error(`November employee missing verified identity: ${employeeId}`);
+    return {
+      ...previous,
+      aliases: [...previous.aliases],
+      target,
+      teamLeader,
+      supervisor,
+      note: "خطة نوفمبر — AAA.xlsx، Sheet1 A1:D28",
+    };
+  }),
+  // Staff absent from the supplied plan remain searchable, but have no
+  // invented November quota or assumed November org assignment.
+  ...SALES_TARGETS["2026-10"]
+    .filter((row) => !novemberIds.has(row.employeeId))
+    .map((row) => ({
+      ...row,
+      aliases: [...row.aliases],
+      target: null,
+      teamLeader: "",
+      supervisor: "",
+      note: "غير مدرج في خطة نوفمبر — AAA.xlsx؛ لا يوجد تارجت أو توزيع فريق منشور",
+    })),
+];
+
 /**
  * A month-keyed set of quotas. The seed below is the default; the server merges
  * PostgreSQL overrides on top and passes the result in, so every function here

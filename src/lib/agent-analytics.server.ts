@@ -14,6 +14,7 @@ import {
 } from "./course-insight.ts";
 import { targetMonths, targetsByPerson, windowTarget, type TargetSource } from "./sales-targets.ts";
 import { loadTargetSource } from "./sales-targets.server";
+import type { TargetRosterAssignment } from "./target-units";
 import { getSlaSnapshot, type SlaRepMonthly, type SlaSalesSummary } from "./sla.server";
 import { isOrganicSourceKey } from "./acquisition-channel";
 import {
@@ -189,6 +190,8 @@ export interface AgentTarget {
 }
 
 export interface TargetCoverage {
+  /** Window-specific published people, including those with no activity yet. */
+  roster?: TargetRosterAssignment[];
   /** Months that publish a quota at all. */
   publishedMonths: string[];
   /** Employees in the current selection matched to a published quota. */
@@ -1121,12 +1124,13 @@ function mergeCallsHubEmployees(
     const row = matched?.[1] ?? blank(key, source.name);
     const alreadyMatched = row.callsHubMatched;
     row.callExtension ||= source.extension;
-    row.totalCalls = (alreadyMatched ? row.totalCalls ?? 0 : 0) + source.totalCalls;
+    row.totalCalls = (alreadyMatched ? (row.totalCalls ?? 0) : 0) + source.totalCalls;
     // Kept for response compatibility; the UI labels this as all PBX calls.
     row.outboundCalls = row.totalCalls;
-    row.answeredCalls = (alreadyMatched ? row.answeredCalls ?? 0 : 0) + source.answeredCalls;
-    row.totalCallSeconds = (alreadyMatched ? row.totalCallSeconds ?? 0 : 0) + source.periodCallSeconds;
-    row.talkSeconds = (alreadyMatched ? row.talkSeconds ?? 0 : 0) + source.periodTalkSeconds;
+    row.answeredCalls = (alreadyMatched ? (row.answeredCalls ?? 0) : 0) + source.answeredCalls;
+    row.totalCallSeconds =
+      (alreadyMatched ? (row.totalCallSeconds ?? 0) : 0) + source.periodCallSeconds;
+    row.talkSeconds = (alreadyMatched ? (row.talkSeconds ?? 0) : 0) + source.periodTalkSeconds;
     row.averageCallSeconds = row.totalCalls ? row.totalCallSeconds / row.totalCalls : 0;
     row.analyzedCalls = source.analyzedCalls;
     row.averageQualityScore = source.averageScore;
@@ -1501,10 +1505,11 @@ function buildTargetCoverage(
       knownNames.has(normalizePersonName(name)),
     );
     if (found) continue;
+    const rosterEntry = entryForWindow(person.entry.employeeId) ?? person.entry;
     unmatched.push({
       employeeId: person.entry.employeeId,
-      name: person.entry.name,
-      teamLeader: person.entry.teamLeader,
+      name: rosterEntry.name,
+      teamLeader: rosterEntry.teamLeader,
       target: windowTarget(person.monthly, filters.from, filters.to).target,
     });
   }
@@ -1550,6 +1555,23 @@ function buildTargetCoverage(
 
   return {
     publishedMonths,
+    roster:
+      companyScope && selectedRosterMonth
+        ? (source[selectedRosterMonth] ?? [])
+            .filter((entry) => entry.target !== null)
+            .map((entry) => ({
+              employeeId: entry.employeeId,
+              name: entry.name,
+              teamLeader: entry.teamLeader,
+              supervisor: entry.supervisor,
+              target:
+                windowTarget(
+                  byName.get(normalizePersonName(entry.name))?.monthly ?? [],
+                  filters.from,
+                  filters.to,
+                ).target ?? entry.target!,
+            }))
+        : [],
     matched: matchedEmployeeIds.size,
     totalTarget,
     totalPaidRevenue,

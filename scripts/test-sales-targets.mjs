@@ -110,6 +110,7 @@ assert.equal(website.entry.employeeId, "632");
 assert.deepEqual(website.monthly, [
   { month: "2026-08", target: 12000 },
   { month: "2026-10", target: 9000 },
+  { month: "2026-11", target: 9000 },
 ]);
 assert.equal(website.entry.teamLeader, "Nader Aziz");
 
@@ -119,6 +120,7 @@ const leaveMonthly = people.byName.get(
 assert.deepEqual(leaveMonthly, [
   { month: "2026-08", target: null },
   { month: "2026-10", target: 6000 },
+  { month: "2026-11", target: null },
 ]);
 
 /* --- October plan supplied on 2026-10-03 ------------------------------- */
