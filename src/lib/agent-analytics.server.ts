@@ -15,6 +15,10 @@ import {
 import { targetMonths, targetsByPerson, windowTarget, type TargetSource } from "./sales-targets.ts";
 import { loadTargetSource } from "./sales-targets.server";
 import type { TargetRosterAssignment } from "./target-units";
+import {
+  buildTeamPersonalSalesContributions,
+  type TeamPersonalSalesContribution,
+} from "./target-team-contributions";
 import { getSlaSnapshot, type SlaRepMonthly, type SlaSalesSummary } from "./sla.server";
 import { isOrganicSourceKey } from "./acquisition-channel";
 import {
@@ -169,6 +173,8 @@ export interface AgentTarget {
   supervisor: string;
   branch: string;
   note: string;
+  /** Approved, period-scoped personal sales counted once in the leader's team. */
+  teamContribution?: TeamPersonalSalesContribution;
   /**
    * The published quota, whole. `null` means no month in the window publishes
    * one — deliberately not `0`, which would read as a real quota the employee
@@ -1440,8 +1446,25 @@ function buildTargetCoverage(
   allAgents: MutableAgent[],
   filters: GlobalFilters,
   source: TargetSource,
+  data: Pick<FilteredData, "accounting" | "invoiced">,
 ): TargetCoverage {
   const { byName, duplicates } = targetsByPerson(source);
+  const teamContributions = buildTeamPersonalSalesContributions(
+    source,
+    data.accounting.map((row) => ({
+      salesperson: row.salesperson,
+      date: accountingReportingDate(row, filters.dateBasis === "invoice" ? "invoice" : "payment"),
+      amount: row.usdPaid,
+      reference: row.isCreditNote ? "" : row.movement,
+    })),
+    data.invoiced.map((row) => ({
+      salesperson: row.salesperson,
+      date: row.revenueDate || row.invoiceDate,
+      amount: row.usdSales,
+      reference: row.orderRef,
+    })),
+    filters,
+  );
   const publishedMonths = targetMonths(source);
   // Team moves in a new workbook must not rewrite a closed month's hierarchy.
   // For a multi-month window, use the latest published roster inside it.
@@ -1480,6 +1503,7 @@ function buildTargetCoverage(
       supervisor: rosterEntry.supervisor,
       branch: rosterEntry.branch,
       note: rosterEntry.note,
+      teamContribution: teamContributions.get(person.entry.employeeId),
       target,
       monthsCovered: resolved.monthsCovered,
       monthsMissing: resolved.monthsMissing,
@@ -1886,7 +1910,7 @@ export async function buildAgentAnalytics(
   // The source is the seed with any saved edits applied; a store that cannot be
   // read falls back to the seed rather than reporting everyone as untargeted.
   const { source: targetSource } = await loadTargetSource();
-  const targets = buildTargetCoverage(agents, [...map.values()], filters, targetSource);
+  const targets = buildTargetCoverage(agents, [...map.values()], filters, targetSource, data);
 
   for (const row of agents) {
     row.performanceScore = calculateEmployeePerformanceScore({

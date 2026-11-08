@@ -85,6 +85,9 @@ export interface TargetUnitMemberInput {
   supervisor?: string;
   /** No matched activity row. Keep the quota, but do not invent performance. */
   rosterOnly?: boolean;
+  /** Explicitly approved personal sales of a leader; never an invented quota. */
+  leaderPersonalSales?: boolean;
+  leaderContributionMonth?: string;
 }
 
 export interface TargetUnitMember extends TargetUnitMemberInput {
@@ -156,10 +159,10 @@ function memberRollup(member: TargetUnitMemberInput): TargetUnitMember {
 }
 
 function totals(members: TargetUnitMember[]) {
-  // Untargeted members remain visible inside their team, but their collections
-  // must stay outside target achievement — the same rule used by the employee
-  // target cards and the overall target notice.
-  const targeted = members.filter((member) => member.target !== null);
+  // Count only published quotas in the denominator. Approved personal sales
+  // of a leader may contribute to the numerator without creating a quota.
+  // Other untargeted people retain the existing policy until explicitly assigned.
+  const targeted = members.filter((member) => member.target !== null || member.leaderPersonalSales);
   const target = targeted.reduce((sum, member) => sum + (member.target ?? 0), 0);
   const paidRevenue = targeted.reduce((sum, member) => sum + member.paidRevenue, 0);
   const orderRevenue = targeted.reduce((sum, member) => sum + (member.orderRevenue ?? 0), 0);

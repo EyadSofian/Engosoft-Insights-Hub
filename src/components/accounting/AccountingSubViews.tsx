@@ -1116,6 +1116,7 @@ export function AccountingAgentsView() {
             row.target !== null &&
             row.target !== undefined &&
             (row.target.target !== null ||
+              Boolean(row.target.teamContribution) ||
               (row.target.teamLeader !== "" && isTargetUnitEmployee(row.target.employeeId))),
         )
         .map((row) => ({
@@ -1123,10 +1124,12 @@ export function AccountingAgentsView() {
           employeeId: row.target.employeeId,
           name: row.displayName,
           target: row.target.target,
-          paidRevenue: row.paidRevenue,
-          orderRevenue: row.orderRevenue,
-          teamLeader: row.target.teamLeader,
-          supervisor: row.target.supervisor,
+          paidRevenue: row.target.teamContribution?.paidRevenue ?? row.paidRevenue,
+          orderRevenue: row.target.teamContribution?.orderRevenue ?? row.orderRevenue,
+          teamLeader: row.target.teamContribution?.teamLeader ?? row.target.teamLeader,
+          supervisor: row.target.teamContribution?.supervisor ?? row.target.supervisor,
+          leaderPersonalSales: Boolean(row.target.teamContribution),
+          leaderContributionMonth: row.target.teamContribution?.month,
         })),
       data.targets.roster,
     ),
@@ -2359,6 +2362,12 @@ function TargetLeaderCard({
   lang: Lang;
   onSelectEmployee: (key: string) => void;
 }) {
+  const personalSales = leader.members.filter((member) => member.leaderPersonalSales);
+  const personalPaid = personalSales.reduce((sum, member) => sum + member.paidRevenue, 0);
+  const personalMonths = [...new Set(personalSales.map((member) => member.leaderContributionMonth))]
+    .filter((month): month is string => Boolean(month))
+    .map((month) => monthLabel(month, lang))
+    .join(" · ");
   const memberAchievementTone = (achievement: number | null) =>
     achievement === null
       ? "neutral"
@@ -2379,8 +2388,13 @@ function TargetLeaderCard({
             {lang === "ar" ? leader.nameAr : leader.nameEn}
           </p>
           <p className="mt-0.5 text-[12px] text-text-muted">
-            {fmtNum(leader.members.length)} {lang === "ar" ? "موظف" : "employees"} ·{" "}
-            {lang === "ar" ? "تارجت" : "target"} {fmtUSDFull(leader.target)}
+            {fmtNum(leader.members.length - personalSales.length)}{" "}
+            {lang === "ar" ? "عضو" : "members"}
+            {personalSales.length > 0 &&
+              (lang === "ar"
+                ? ` + ${fmtNum(personalSales.length)} قائد فريق`
+                : ` + ${fmtNum(personalSales.length)} team leader`)}{" "}
+            · {lang === "ar" ? "تارجت" : "target"} {fmtUSDFull(leader.target)}
           </p>
         </div>
         <div className="shrink-0 text-end">
@@ -2408,6 +2422,21 @@ function TargetLeaderCard({
             value={fmtUSDFull(leader.remaining)}
           />
         </div>
+        {personalSales.length > 0 && (
+          <div className="mb-3 rounded-xl border border-brand/15 bg-brand-soft/40 px-3 py-2 text-xs leading-6 text-text-muted">
+            <span className="font-bold text-brand">
+              {lang === "ar" ? "تحصيل قائد الفريق الشخصي" : "Team leader's personal collections"}
+              {": "}
+              {fmtUSDFull(personalPaid)}
+            </span>
+            {personalMonths && <span className="ms-2">{personalMonths}</span>}
+            <span className="block">
+              {lang === "ar"
+                ? "داخل تحصيل التيم ونسبة تحقيقه مرة واحدة، بدون إضافة تارجت فردي. لا يُضاف مرة أخرى إلى إجمالي الشركة."
+                : "Included once in team collections and achievement, without creating an individual quota. Not added again to the company total."}
+            </span>
+          </div>
+        )}
         <div className="space-y-1.5">
           {leader.members.map((member) => (
             <button
@@ -2420,13 +2449,17 @@ function TargetLeaderCard({
               <span className="min-w-0">
                 <span className="block truncate text-xs font-bold text-text">{member.name}</span>
                 <span className="mt-0.5 block text-[12px] text-text-subtle">
-                  {member.rosterOnly
+                  {member.leaderPersonalSales
                     ? lang === "ar"
-                      ? "لا يوجد سجل نشاط مطابق في النطاق؛ التارجت محفوظ"
-                      : "No matching activity in scope; quota retained"
-                    : lang === "ar"
-                      ? "افتح أداء الموظف"
-                      : "Open employee performance"}
+                      ? "قائد الفريق · تحصيل شخصي ضمن تحقيق التيم"
+                      : "Team leader · personal collections included in team achievement"
+                    : member.rosterOnly
+                      ? lang === "ar"
+                        ? "لا يوجد سجل نشاط مطابق في النطاق؛ التارجت محفوظ"
+                        : "No matching activity in scope; quota retained"
+                      : lang === "ar"
+                        ? "افتح أداء الموظف"
+                        : "Open employee performance"}
                 </span>
               </span>
               <span className="text-end">
