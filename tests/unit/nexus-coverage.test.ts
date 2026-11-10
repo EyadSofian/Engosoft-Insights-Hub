@@ -82,6 +82,7 @@ describe("the registry describes reality", () => {
       "months",
       "profitability",
       "marketing",
+      "messaging-costs",
     ]);
     expect(surfaceById("courses")!.views).toEqual(["campaigns", "alerts", "all"]);
     expect(surfaceById("lost")!.views).toEqual(["team", "course"]);

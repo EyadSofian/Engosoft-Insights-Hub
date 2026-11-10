@@ -434,10 +434,6 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
     // Invoice rows carry customer names.
     sensitivity: "personal",
     views: [
-      {
-        id: "messaging-costs",
-        title: t("مصروفات الإعلانات وواتساب", "Advertising and WhatsApp costs"),
-      },
       { id: "summary", title: t("الملخص", "Summary") },
       { id: "months", title: t("الشهور", "Months"), operations: ["summary", "trend"] },
       {
@@ -459,6 +455,10 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
             "Revenue here is dated by when the lead arrived; the accounting summary dates it by payment. The totals do not match and must not be added.",
           ),
         ],
+      },
+      {
+        id: "messaging-costs",
+        title: t("مصروفات الإعلانات وواتساب", "Advertising and WhatsApp costs"),
       },
     ],
     defaultViews: ["summary"],

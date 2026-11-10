@@ -46,6 +46,7 @@ describe("every visible route has a manifest", () => {
       "months",
       "profitability",
       "marketing",
+      "messaging-costs",
     ]);
     expect(surfaceManifest("courses")!.tabs.map((t) => t.id)).toEqual([
       "campaigns",

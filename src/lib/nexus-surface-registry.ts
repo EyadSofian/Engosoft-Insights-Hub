@@ -447,15 +447,6 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     ),
     tabs: [
       {
-        id: "messaging-costs",
-        title: q("مصروفات الإعلانات وواتساب", "Advertising & WhatsApp costs"),
-        summary: q(
-          "استهلاك Meta منفصل عن الإعلانات والسحوبات، مع دليل إرسال الحملات ومبيعات Odoo.",
-          "Meta usage separate from advertising and card charges, with dispatch evidence and Odoo source revenue.",
-        ),
-        sections: ["kpis"],
-      },
-      {
         id: "summary",
         title: q("الملخص", "Summary"),
         summary: q("الصورة العامة للإيراد.", "The revenue picture."),
@@ -479,6 +470,15 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
         summary: q(
           "كل صفقة ومصدرها وحملتها وإعلانها ومادتها والإيراد المدفوع، مؤرخة بتاريخ وصول العميل.",
           "Each deal with its source, campaign, ad, creative and paid revenue, dated by when the lead arrived.",
+        ),
+        sections: ["kpis"],
+      },
+      {
+        id: "messaging-costs",
+        title: q("مصروفات الإعلانات وواتساب", "Advertising & WhatsApp costs"),
+        summary: q(
+          "استهلاك Meta منفصل عن الإعلانات والسحوبات، مع دليل إرسال الحملات ومبيعات Odoo.",
+          "Meta usage separate from advertising and card charges, with dispatch evidence and Odoo source revenue.",
         ),
         sections: ["kpis"],
       },
