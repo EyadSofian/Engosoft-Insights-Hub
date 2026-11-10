@@ -52,6 +52,7 @@ import type { AgentAnalyticsResult } from "@/lib/agent-analytics.server";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 import { PLATFORM_LABEL, PLATFORMS, resolveSpendByPlatform } from "@/lib/constants";
 import { OverviewSalesAttribution } from "@/components/overview-sales-attribution";
+import { MarketingCosts } from "@/components/MarketingCosts";
 
 export const Route = createFileRoute("/")({ component: Overview });
 
@@ -601,6 +602,8 @@ function Overview() {
             </div>
           )}
         </PageSection>
+
+        <MarketingCosts compact />
 
         {/* 3 — What needs a decision. */}
 

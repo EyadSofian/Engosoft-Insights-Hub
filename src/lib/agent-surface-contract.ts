@@ -230,6 +230,13 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
         why: "The monthly target and achievement block the overview renders but does not serve.",
         summaryPaths: ["targets", "chatwoot", "summary", ...HEALTH_PATHS],
       },
+      {
+        endpoint: "/api/marketing-costs",
+        as: "messagingCosts",
+        required: false,
+        why: "Separate advertising usage, Meta WhatsApp account usage, broadcast dispatch coverage and reconciliation availability.",
+        summaryPaths: ["ads", "whatsapp", "campaigns", "billing"],
+      },
     ],
     freshnessPaths: ["syncedAt", "health"],
     caveats: [ATTRIBUTION_CAVEAT, COLLECTION_BASIS_CAVEAT],
@@ -427,6 +434,10 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
     // Invoice rows carry customer names.
     sensitivity: "personal",
     views: [
+      {
+        id: "messaging-costs",
+        title: t("مصروفات الإعلانات وواتساب", "Advertising and WhatsApp costs"),
+      },
       { id: "summary", title: t("الملخص", "Summary") },
       { id: "months", title: t("الشهور", "Months"), operations: ["summary", "trend"] },
       {
@@ -472,6 +483,14 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
         ],
       },
       {
+        endpoint: "/api/marketing-costs",
+        as: "messagingCosts",
+        required: true,
+        views: ["messaging-costs"],
+        why: "Live Meta WhatsApp usage, complete authenticated campaign history, Odoo source revenue and conservative invoice-assistance evidence. No inferred card charges or tax.",
+        summaryPaths: ["ads", "whatsapp", "campaigns", "billing"],
+      },
+      {
         endpoint: "/api/acquisition/closed-loop",
         as: "marketingRevenue",
         required: true,
@@ -513,6 +532,22 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
         kind: "product",
         fields: ["name", "label", "productCode", "invoices", "salesOrders", "revenue", "share"],
         limit: 30,
+      },
+      {
+        collection: "messagingCosts.whatsapp.campaigns",
+        kind: "broadcast campaign",
+        fields: [
+          "campaign",
+          "templates",
+          "operators",
+          "accepted",
+          "estimatedUsd",
+          "assistedInvoices",
+          "assistedRevenue",
+          "errors",
+          "skipped",
+        ],
+        limit: 100,
       },
       {
         collection: "byMainCategory",

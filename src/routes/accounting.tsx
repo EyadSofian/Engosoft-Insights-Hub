@@ -61,9 +61,16 @@ import { ClosedLoopSalesBridge } from "@/components/acquisition/ClosedLoop";
 import { SalesPerformance } from "@/components/acquisition/SalesPerformance";
 import { EntryCohortView } from "@/components/accounting/EntryCohortView";
 import { NetSalesView } from "@/components/accounting/NetSalesView";
+import { MarketingCosts } from "@/components/MarketingCosts";
 
 type AccountingView =
-  "summary" | "months" | "cohorts" | "profitability" | "net-sales" | "marketing";
+  | "summary"
+  | "months"
+  | "cohorts"
+  | "profitability"
+  | "net-sales"
+  | "marketing"
+  | "messaging-costs";
 const ACCOUNTING_VIEWS: readonly AccountingView[] = [
   "summary",
   "months",
@@ -71,6 +78,7 @@ const ACCOUNTING_VIEWS: readonly AccountingView[] = [
   "profitability",
   "net-sales",
   "marketing",
+  "messaging-costs",
 ];
 
 export const Route = createFileRoute("/accounting")({
@@ -183,7 +191,7 @@ function Accounting() {
   const [fxSarInput, setFxSarInput] = useState(filters.fxSar ?? String(DEFAULT_FX_RATES.SAR));
   const [fxError, setFxError] = useState("");
   const { data, isLoading, error, refetch } = useApi<AccountingResponse>("/api/accounting", {
-    enabled: view !== "net-sales" && view !== "profitability",
+    enabled: view !== "net-sales" && view !== "profitability" && view !== "messaging-costs",
   });
   const { data: filterOptions } = useFiltersData();
   const dateBasis = filters.dateBasis === "invoice" ? "invoice" : "payment";
@@ -220,7 +228,7 @@ function Accounting() {
     filterStore.setFxRates(DEFAULT_FX_RATES.EGP, DEFAULT_FX_RATES.SAR);
   };
 
-  if (error && view !== "net-sales" && view !== "profitability")
+  if (error && view !== "net-sales" && view !== "profitability" && view !== "messaging-costs")
     return <ErrorState message={(error as Error).message} onRetry={() => refetch()} />;
 
   const cols: Col<AccountingDetail>[] = [
@@ -426,6 +434,10 @@ function Accounting() {
               ["cohorts", lang === "ar" ? "مصدر العملاء" : "Customer cohorts"],
               ["profitability", lang === "ar" ? "الأرباح والخسائر" : "Profit and Loss"],
               ["net-sales", lang === "ar" ? "صافي المبيعات" : "Net sales"],
+              [
+                "messaging-costs",
+                lang === "ar" ? "مصروفات الإعلانات وواتساب" : "Advertising & WhatsApp costs",
+              ],
             ] as const
           ).map(([value, label]) => (
             <button
@@ -552,6 +564,8 @@ function Accounting() {
 
       {view === "marketing" ? (
         <SalesPerformance />
+      ) : view === "messaging-costs" ? (
+        <MarketingCosts />
       ) : view === "net-sales" ? (
         <NetSalesView />
       ) : view === "profitability" ? (

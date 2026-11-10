@@ -70,6 +70,7 @@ import { Route as ApiLostRouteImport } from './routes/api/lost'
 import { Route as ApiLostArchiveAuditRouteImport } from './routes/api/lost-archive-audit'
 import { Route as ApiLostChatterRouteImport } from './routes/api/lost-chatter'
 import { Route as ApiManagementReviewRouteImport } from './routes/api/management-review'
+import { Route as ApiMarketingCostsRouteImport } from './routes/api/marketing-costs'
 import { Route as ApiMediaBuyersRouteImport } from './routes/api/media-buyers'
 import { Route as ApiMediaPlanRouteImport } from './routes/api/media-plan'
 import { Route as ApiMediaPlanActivityRouteImport } from './routes/api/media-plan-activity'
@@ -449,6 +450,11 @@ const ApiLostChatterRoute = ApiLostChatterRouteImport.update({
 const ApiManagementReviewRoute = ApiManagementReviewRouteImport.update({
   id: '/api/management-review',
   path: '/api/management-review',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMarketingCostsRoute = ApiMarketingCostsRouteImport.update({
+  id: '/api/marketing-costs',
+  path: '/api/marketing-costs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMediaBuyersRoute = ApiMediaBuyersRouteImport.update({
@@ -886,6 +892,7 @@ export interface FileRoutesByFullPath {
   '/api/lost-archive-audit': typeof ApiLostArchiveAuditRoute
   '/api/lost-chatter': typeof ApiLostChatterRoute
   '/api/management-review': typeof ApiManagementReviewRoute
+  '/api/marketing-costs': typeof ApiMarketingCostsRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
   '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
@@ -1020,6 +1027,7 @@ export interface FileRoutesByTo {
   '/api/lost-archive-audit': typeof ApiLostArchiveAuditRoute
   '/api/lost-chatter': typeof ApiLostChatterRoute
   '/api/management-review': typeof ApiManagementReviewRoute
+  '/api/marketing-costs': typeof ApiMarketingCostsRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
   '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
@@ -1155,6 +1163,7 @@ export interface FileRoutesById {
   '/api/lost-archive-audit': typeof ApiLostArchiveAuditRoute
   '/api/lost-chatter': typeof ApiLostChatterRoute
   '/api/management-review': typeof ApiManagementReviewRoute
+  '/api/marketing-costs': typeof ApiMarketingCostsRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
   '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
@@ -1291,6 +1300,7 @@ export interface FileRouteTypes {
     | '/api/lost-archive-audit'
     | '/api/lost-chatter'
     | '/api/management-review'
+    | '/api/marketing-costs'
     | '/api/media-buyers'
     | '/api/media-plan'
     | '/api/media-plan-activity'
@@ -1425,6 +1435,7 @@ export interface FileRouteTypes {
     | '/api/lost-archive-audit'
     | '/api/lost-chatter'
     | '/api/management-review'
+    | '/api/marketing-costs'
     | '/api/media-buyers'
     | '/api/media-plan'
     | '/api/media-plan-activity'
@@ -1559,6 +1570,7 @@ export interface FileRouteTypes {
     | '/api/lost-archive-audit'
     | '/api/lost-chatter'
     | '/api/management-review'
+    | '/api/marketing-costs'
     | '/api/media-buyers'
     | '/api/media-plan'
     | '/api/media-plan-activity'
@@ -1694,6 +1706,7 @@ export interface RootRouteChildren {
   ApiLostArchiveAuditRoute: typeof ApiLostArchiveAuditRoute
   ApiLostChatterRoute: typeof ApiLostChatterRoute
   ApiManagementReviewRoute: typeof ApiManagementReviewRoute
+  ApiMarketingCostsRoute: typeof ApiMarketingCostsRoute
   ApiMediaBuyersRoute: typeof ApiMediaBuyersRoute
   ApiMediaPlanRoute: typeof ApiMediaPlanRoute
   ApiMediaPlanActivityRoute: typeof ApiMediaPlanActivityRoute
@@ -2194,6 +2207,13 @@ declare module '@tanstack/react-router' {
       path: '/api/management-review'
       fullPath: '/api/management-review'
       preLoaderRoute: typeof ApiManagementReviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/marketing-costs': {
+      id: '/api/marketing-costs'
+      path: '/api/marketing-costs'
+      fullPath: '/api/marketing-costs'
+      preLoaderRoute: typeof ApiMarketingCostsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/media-buyers': {
@@ -2758,6 +2778,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLostArchiveAuditRoute: ApiLostArchiveAuditRoute,
   ApiLostChatterRoute: ApiLostChatterRoute,
   ApiManagementReviewRoute: ApiManagementReviewRoute,
+  ApiMarketingCostsRoute: ApiMarketingCostsRoute,
   ApiMediaBuyersRoute: ApiMediaBuyersRoute,
   ApiMediaPlanRoute: ApiMediaPlanRoute,
   ApiMediaPlanActivityRoute: ApiMediaPlanActivityRoute,
