@@ -295,6 +295,7 @@ async function buildReport(filters: GlobalFilters) {
   const notApplicable = Boolean(filters.platform && filters.platform !== "meta");
   const scopeNarrowed = Boolean(
     filters.platform ||
+    filters.channel ||
     filters.course ||
     filters.mainCategory ||
     filters.source ||

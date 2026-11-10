@@ -153,10 +153,13 @@ describe("live marketing cost report", () => {
     expect(r.combinedUsageUsd).toBeNull();
     expect(r.ads.spendUsd).toBe(100);
   });
-  it("does not blend account-wide WhatsApp cost with a course-filtered advertising subtotal", async () => {
-    vi.stubGlobal("fetch", fetchMock());
-    const r = await marketingCostsReport({ from, to, course: "CFM" });
-    expect(r.scopeNarrowed).toBe(true);
-    expect(r.combinedUsageUsd).toBeNull();
-  });
+  it.each([{ course: "CFM" }, { channel: "organic" as const }])(
+    "does not blend account-wide WhatsApp cost with a narrowed advertising subtotal: %j",
+    async (scope) => {
+      vi.stubGlobal("fetch", fetchMock());
+      const r = await marketingCostsReport({ from, to, ...scope });
+      expect(r.scopeNarrowed).toBe(true);
+      expect(r.combinedUsageUsd).toBeNull();
+    },
+  );
 });
