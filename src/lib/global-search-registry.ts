@@ -23,6 +23,29 @@ const MONEY = ["money", "فلوس", "flous", "filos", "مبلغ", "مال", "cas
 
 export const SEARCH_DESTINATIONS: SearchDestination[] = [
   {
+    id: "daily-updates",
+    title: "Daily Updates",
+    titleAr: "دايلي أبديتس",
+    route: "/daily-updates",
+    category: "report",
+    hint: {
+      ar: "أداء كل كورس اليوم والشهر، من الليد إلى التحصيل",
+      en: "Every course today and month to date, from lead to collection",
+    },
+    keywords: [
+      "daily updates",
+      "daily update",
+      "دايلي ابديتس",
+      "دايلي أبديتس",
+      "تحديث يومي",
+      "اليوم",
+      "يومي",
+      "كل كورس",
+      "daily course",
+      "اللوست اليوم",
+    ],
+  },
+  {
     id: "overview",
     title: "Overview",
     titleAr: "نظرة عامة",

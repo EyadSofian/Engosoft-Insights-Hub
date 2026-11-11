@@ -110,6 +110,12 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         tabLabel: { ar: "مراجعة الأداء والخطة", en: "Performance and plan review" },
       },
       {
+        to: "/daily-updates",
+        key: "business_analytics",
+        icon: CalendarClock,
+        tabLabel: { ar: "دايلي أبديتس", en: "Daily Updates" },
+      },
+      {
         to: "/yoy",
         key: "yoy",
         icon: CalendarRange,

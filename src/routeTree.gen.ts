@@ -17,6 +17,7 @@ import { Route as AttributionRouteImport } from './routes/attribution'
 import { Route as CampaignsRouteImport } from './routes/campaigns'
 import { Route as CoursesRouteImport } from './routes/courses'
 import { Route as CreativesRouteImport } from './routes/creatives'
+import { Route as DailyUpdatesRouteImport } from './routes/daily-updates'
 import { Route as FullInvoicedRouteImport } from './routes/full-invoiced'
 import { Route as GuideRouteImport } from './routes/guide'
 import { Route as LandingPagesRouteImport } from './routes/landing-pages'
@@ -51,6 +52,7 @@ import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiCourseLeadAlertsRouteImport } from './routes/api/course-lead-alerts'
 import { Route as ApiCoursesRouteImport } from './routes/api/courses'
 import { Route as ApiCrmCallsRouteImport } from './routes/api/crm-calls'
+import { Route as ApiDailyUpdatesRouteImport } from './routes/api/daily-updates'
 import { Route as ApiEmployeeCallDetailRouteImport } from './routes/api/employee-call-detail'
 import { Route as ApiEmployeeCallRecordingRouteImport } from './routes/api/employee-call-recording'
 import { Route as ApiEmployeeCallsRouteImport } from './routes/api/employee-calls'
@@ -181,6 +183,11 @@ const CoursesRoute = CoursesRouteImport.update({
 const CreativesRoute = CreativesRouteImport.update({
   id: '/creatives',
   path: '/creatives',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DailyUpdatesRoute = DailyUpdatesRouteImport.update({
+  id: '/daily-updates',
+  path: '/daily-updates',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FullInvoicedRoute = FullInvoicedRouteImport.update({
@@ -352,6 +359,11 @@ const ApiCoursesRoute = ApiCoursesRouteImport.update({
 const ApiCrmCallsRoute = ApiCrmCallsRouteImport.update({
   id: '/api/crm-calls',
   path: '/api/crm-calls',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDailyUpdatesRoute = ApiDailyUpdatesRouteImport.update({
+  id: '/api/daily-updates',
+  path: '/api/daily-updates',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiEmployeeCallDetailRoute = ApiEmployeeCallDetailRouteImport.update({
@@ -839,6 +851,7 @@ export interface FileRoutesByFullPath {
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
   '/creatives': typeof CreativesRoute
+  '/daily-updates': typeof DailyUpdatesRoute
   '/full-invoiced': typeof FullInvoicedRoute
   '/guide': typeof GuideRoute
   '/landing-pages': typeof LandingPagesRoute
@@ -873,6 +886,7 @@ export interface FileRoutesByFullPath {
   '/api/course-lead-alerts': typeof ApiCourseLeadAlertsRoute
   '/api/courses': typeof ApiCoursesRoute
   '/api/crm-calls': typeof ApiCrmCallsRoute
+  '/api/daily-updates': typeof ApiDailyUpdatesRoute
   '/api/employee-call-detail': typeof ApiEmployeeCallDetailRoute
   '/api/employee-call-recording': typeof ApiEmployeeCallRecordingRoute
   '/api/employee-calls': typeof ApiEmployeeCallsRoute
@@ -974,6 +988,7 @@ export interface FileRoutesByTo {
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
   '/creatives': typeof CreativesRoute
+  '/daily-updates': typeof DailyUpdatesRoute
   '/full-invoiced': typeof FullInvoicedRoute
   '/guide': typeof GuideRoute
   '/landing-pages': typeof LandingPagesRoute
@@ -1008,6 +1023,7 @@ export interface FileRoutesByTo {
   '/api/course-lead-alerts': typeof ApiCourseLeadAlertsRoute
   '/api/courses': typeof ApiCoursesRoute
   '/api/crm-calls': typeof ApiCrmCallsRoute
+  '/api/daily-updates': typeof ApiDailyUpdatesRoute
   '/api/employee-call-detail': typeof ApiEmployeeCallDetailRoute
   '/api/employee-call-recording': typeof ApiEmployeeCallRecordingRoute
   '/api/employee-calls': typeof ApiEmployeeCallsRoute
@@ -1110,6 +1126,7 @@ export interface FileRoutesById {
   '/campaigns': typeof CampaignsRoute
   '/courses': typeof CoursesRoute
   '/creatives': typeof CreativesRoute
+  '/daily-updates': typeof DailyUpdatesRoute
   '/full-invoiced': typeof FullInvoicedRoute
   '/guide': typeof GuideRoute
   '/landing-pages': typeof LandingPagesRoute
@@ -1144,6 +1161,7 @@ export interface FileRoutesById {
   '/api/course-lead-alerts': typeof ApiCourseLeadAlertsRoute
   '/api/courses': typeof ApiCoursesRoute
   '/api/crm-calls': typeof ApiCrmCallsRoute
+  '/api/daily-updates': typeof ApiDailyUpdatesRoute
   '/api/employee-call-detail': typeof ApiEmployeeCallDetailRoute
   '/api/employee-call-recording': typeof ApiEmployeeCallRecordingRoute
   '/api/employee-calls': typeof ApiEmployeeCallsRoute
@@ -1247,6 +1265,7 @@ export interface FileRouteTypes {
     | '/campaigns'
     | '/courses'
     | '/creatives'
+    | '/daily-updates'
     | '/full-invoiced'
     | '/guide'
     | '/landing-pages'
@@ -1281,6 +1300,7 @@ export interface FileRouteTypes {
     | '/api/course-lead-alerts'
     | '/api/courses'
     | '/api/crm-calls'
+    | '/api/daily-updates'
     | '/api/employee-call-detail'
     | '/api/employee-call-recording'
     | '/api/employee-calls'
@@ -1382,6 +1402,7 @@ export interface FileRouteTypes {
     | '/campaigns'
     | '/courses'
     | '/creatives'
+    | '/daily-updates'
     | '/full-invoiced'
     | '/guide'
     | '/landing-pages'
@@ -1416,6 +1437,7 @@ export interface FileRouteTypes {
     | '/api/course-lead-alerts'
     | '/api/courses'
     | '/api/crm-calls'
+    | '/api/daily-updates'
     | '/api/employee-call-detail'
     | '/api/employee-call-recording'
     | '/api/employee-calls'
@@ -1517,6 +1539,7 @@ export interface FileRouteTypes {
     | '/campaigns'
     | '/courses'
     | '/creatives'
+    | '/daily-updates'
     | '/full-invoiced'
     | '/guide'
     | '/landing-pages'
@@ -1551,6 +1574,7 @@ export interface FileRouteTypes {
     | '/api/course-lead-alerts'
     | '/api/courses'
     | '/api/crm-calls'
+    | '/api/daily-updates'
     | '/api/employee-call-detail'
     | '/api/employee-call-recording'
     | '/api/employee-calls'
@@ -1653,6 +1677,7 @@ export interface RootRouteChildren {
   CampaignsRoute: typeof CampaignsRoute
   CoursesRoute: typeof CoursesRoute
   CreativesRoute: typeof CreativesRoute
+  DailyUpdatesRoute: typeof DailyUpdatesRoute
   FullInvoicedRoute: typeof FullInvoicedRoute
   GuideRoute: typeof GuideRoute
   LandingPagesRoute: typeof LandingPagesRoute
@@ -1687,6 +1712,7 @@ export interface RootRouteChildren {
   ApiCourseLeadAlertsRoute: typeof ApiCourseLeadAlertsRoute
   ApiCoursesRoute: typeof ApiCoursesRoute
   ApiCrmCallsRoute: typeof ApiCrmCallsRoute
+  ApiDailyUpdatesRoute: typeof ApiDailyUpdatesRoute
   ApiEmployeeCallDetailRoute: typeof ApiEmployeeCallDetailRoute
   ApiEmployeeCallRecordingRoute: typeof ApiEmployeeCallRecordingRoute
   ApiEmployeeCallsRoute: typeof ApiEmployeeCallsRoute
@@ -1836,6 +1862,13 @@ declare module '@tanstack/react-router' {
       path: '/creatives'
       fullPath: '/creatives'
       preLoaderRoute: typeof CreativesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/daily-updates': {
+      id: '/daily-updates'
+      path: '/daily-updates'
+      fullPath: '/daily-updates'
+      preLoaderRoute: typeof DailyUpdatesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/full-invoiced': {
@@ -2074,6 +2107,13 @@ declare module '@tanstack/react-router' {
       path: '/api/crm-calls'
       fullPath: '/api/crm-calls'
       preLoaderRoute: typeof ApiCrmCallsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/daily-updates': {
+      id: '/api/daily-updates'
+      path: '/api/daily-updates'
+      fullPath: '/api/daily-updates'
+      preLoaderRoute: typeof ApiDailyUpdatesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/employee-call-detail': {
@@ -2725,6 +2765,7 @@ const rootRouteChildren: RootRouteChildren = {
   CampaignsRoute: CampaignsRoute,
   CoursesRoute: CoursesRoute,
   CreativesRoute: CreativesRoute,
+  DailyUpdatesRoute: DailyUpdatesRoute,
   FullInvoicedRoute: FullInvoicedRoute,
   GuideRoute: GuideRoute,
   LandingPagesRoute: LandingPagesRoute,
@@ -2759,6 +2800,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiCourseLeadAlertsRoute: ApiCourseLeadAlertsRoute,
   ApiCoursesRoute: ApiCoursesRoute,
   ApiCrmCallsRoute: ApiCrmCallsRoute,
+  ApiDailyUpdatesRoute: ApiDailyUpdatesRoute,
   ApiEmployeeCallDetailRoute: ApiEmployeeCallDetailRoute,
   ApiEmployeeCallRecordingRoute: ApiEmployeeCallRecordingRoute,
   ApiEmployeeCallsRoute: ApiEmployeeCallsRoute,

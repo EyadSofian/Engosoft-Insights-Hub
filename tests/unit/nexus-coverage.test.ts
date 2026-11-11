@@ -146,8 +146,8 @@ describe("the registry describes reality", () => {
 describe("coverage is reported honestly", () => {
   it("counts the visible analytical surfaces", () => {
     const analytical = INSIGHTS_SURFACES.filter((s) => s.status !== "NOT_APPLICABLE");
-    // 20th: /number-review, the source-reconciliation report.
-    expect(analytical).toHaveLength(20);
+    // /daily-updates adds the course operations brief alongside Number review.
+    expect(analytical).toHaveLength(21);
   });
 
   it("names why anything is less than fully connected", () => {

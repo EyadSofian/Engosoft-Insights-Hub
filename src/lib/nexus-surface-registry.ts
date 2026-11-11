@@ -941,6 +941,22 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     ],
   },
   {
+    id: "daily_updates",
+    route: "/daily-updates",
+    title: q("دايلي أبديتس", "Daily Updates"),
+    description: q(
+      "متابعة يومية لكل كورس: الدخول وحركة Lost والتحويل لدفع والتحصيل والحملات.",
+      "Daily course brief: entries, Lost movement, lead-to-paid conversion, collections and campaigns.",
+    ),
+    tabs: [],
+    sections: [],
+    elements: [],
+    suggestedQuestions: [
+      q("أي كورس جاب ليدز النهارده؟", "Which course brought leads today?"),
+      q("اللوست النهارده من ليدز جديدة ولا قديمة؟", "Are today's losses from new or older leads?"),
+    ],
+  },
+  {
     id: "social_media",
     route: "/social-media",
     title: q("السوشيال ميديا", "Social media"),
