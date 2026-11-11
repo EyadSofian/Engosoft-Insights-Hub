@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, within, waitFor } from "@testing-library/react";
 import { I18nProvider } from "@/lib/i18n";
 import { buildDailyUpdates } from "@/lib/daily-updates";
 import { DailyUpdates } from "@/routes/daily-updates";
 const query = vi.hoisted(() => vi.fn());
+const exportExcel = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+vi.mock("@/lib/daily-updates-export", () => ({ downloadDailyUpdatesExcel: exportExcel }));
 vi.mock("@tanstack/react-query", () => ({ useQuery: query }));
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => () => ({}),
@@ -78,6 +80,25 @@ afterEach(() => {
   localStorage.clear();
 });
 describe("daily updates presentation", () => {
+  it("exports the loaded day and visible course rows as Excel", async () => {
+    render(
+      <I18nProvider>
+        <DailyUpdates />
+      </I18nProvider>,
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "Search courses" }), {
+      target: { value: "CFM" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Export Excel" }));
+    await waitFor(() =>
+      expect(exportExcel).toHaveBeenCalledWith(
+        expect.objectContaining({ day: "2026-11-11" }),
+        [expect.objectContaining({ course: "CFM" })],
+        "en",
+        "CFM",
+      ),
+    );
+  });
   it("opens the actual cohort records and Odoo link, not only a generic destination", () => {
     render(
       <I18nProvider>

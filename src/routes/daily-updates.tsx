@@ -11,6 +11,7 @@ import {
   TrendingDown,
   Wallet,
   ChartNoAxesCombined,
+  Download,
 } from "lucide-react";
 import { Card, Notice, Skeleton } from "@/components/ui-bits";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -49,6 +50,8 @@ export function DailyUpdates() {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState(false);
   useModalGuard(Boolean(detail));
   useRegisterNexusView("daily_updates", { section: "daily-updates", parameters: { day } });
   const params = new URLSearchParams();
@@ -83,6 +86,19 @@ export function DailyUpdates() {
   const rows =
     data?.rows.filter((r) => courseName(r.course).toLowerCase().includes(search.toLowerCase())) ||
     [];
+  const exportExcel = async () => {
+    if (!data || exporting) return;
+    setExporting(true);
+    setExportError(false);
+    try {
+      const { downloadDailyUpdatesExcel } = await import("@/lib/daily-updates-export");
+      await downloadDailyUpdatesExcel(data, rows, lang, search);
+    } catch {
+      setExportError(true);
+    } finally {
+      setExporting(false);
+    }
+  };
   const scoped = (course: string, month: boolean) => {
     filterStore.setDates(month ? day.slice(0, 7) + "-01" : day, day);
     filterStore.set({
@@ -166,9 +182,30 @@ export function DailyUpdates() {
               <RefreshCw size={15} className={query.isFetching ? "animate-spin" : ""} />
               {ar ? "تحديث" : "Refresh"}
             </button>
+            <button
+              onClick={exportExcel}
+              disabled={!data || query.isFetching || exporting || rows.length === 0}
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-surface px-4 text-sm font-bold text-text disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Download size={16} />
+              {exporting
+                ? ar
+                  ? "جارٍ تجهيز Excel…"
+                  : "Preparing Excel…"
+                : ar
+                  ? "تصدير Excel"
+                  : "Export Excel"}
+            </button>
           </div>
         </div>
       </header>
+      {exportError && (
+        <Notice tone="warning">
+          {ar
+            ? "تعذر تجهيز ملف Excel. حاول مرة أخرى."
+            : "The Excel file could not be prepared. Please retry."}
+        </Notice>
+      )}
       <p className="text-xs leading-6 text-text-muted">
         {ar
           ? "تاريخ هذه الصفحة مستقل عن فلتر الفترة العلوي. باقي فلاتر الكورس والمنصة والفريق تُطبّق. اليوم الجاري أرقام مبدئية حتى اكتمال المزامنة."
