@@ -260,6 +260,15 @@ export function DailyUpdates() {
                   " positive invoices this month have no unambiguous Opportunity link. Collections include them; conversion does not guess their leads, so the rate is an evidenced minimum."}
             </Notice>
           )}
+          {(data.lossEvidenceCoverage?.ambiguousEvents || 0) +
+            (data.lossEvidenceCoverage?.archiveWithoutLostEvidence || 0) >
+            0 && (
+            <Notice tone="info">
+              {ar
+                ? "حركة Lost المعروضة مقتصرة على أحداث Chatter المؤكدة. توجد أحداث أو أرشفة بلا دليل Lost حاسم لم نضفها تخمينًا."
+                : "Lost movement includes confirmed Chatter events only. Ambiguous events or archives without conclusive Lost evidence are not guessed into the count."}
+            </Notice>
+          )}
           <Card className="overflow-hidden !p-0">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-5">
               <div>
@@ -419,9 +428,17 @@ export function DailyUpdates() {
                           {"amount" in r
                             ? fmtUSDFull(r.amount)
                             : "status" in r
-                              ? r.status
+                              ? ar
+                                ? { open: "مفتوح", won: "ناجح", lost: "مفقود", lead: "ليد نشط" }[
+                                    r.status
+                                  ] || r.status
+                                : r.status
                               : "recordType" in r
-                                ? r.recordType
+                                ? ar
+                                  ? r.recordType === "lead"
+                                    ? "ليد"
+                                    : "فرصة بيعية"
+                                  : r.recordType
                                 : "—"}
                         </td>
                       </tr>

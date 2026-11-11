@@ -185,6 +185,11 @@ async function buildReport(scope: GlobalFilters, day: string) {
     errors,
     financialOnlyScope,
     ambiguousOrderLinks,
+    lossEvidenceCoverage: {
+      ambiguousEvents: movement?.ambiguousEvents ?? null,
+      archiveWithoutLostEvidence: movement?.unknownArchiveEvents ?? null,
+      repeatedRecords: movement?.repeatedRecords ?? null,
+    },
     unlinkedInvoices: new Set(
       payments.filter((p) => p.amount > 0 && !p.leadId).map((p) => p.company + "\0" + p.invoice),
     ).size,
