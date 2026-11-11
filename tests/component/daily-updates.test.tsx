@@ -123,7 +123,7 @@ describe("daily updates presentation", () => {
       </I18nProvider>,
     );
     expect(screen.getByRole("heading", { name: "دايلي أبديتس" })).toBeTruthy();
-    const card = screen.getAllByText("اتعمل Lost اليوم", { exact: true })[0].parentElement!;
+    const card = screen.getAllByText("Lost بتاريخ اليوم", { exact: true })[0].parentElement!;
     expect(within(card).getByText("—")).toBeTruthy();
   });
 });

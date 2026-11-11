@@ -1,4 +1,4 @@
-import { getFiltered, attributedAdCourse } from "./metrics.server";
+import { getFiltered, attributedAdCourse, authoritativeLostLeads } from "./metrics.server";
 import { loadCrmDateRows } from "./lead-course-distribution.server";
 import { loadLostMovement, matchesLostMovementDimensions } from "./crm-lost-movement.server";
 import { loadCrmRawByIds } from "./crm-odoo.server";
@@ -57,7 +57,7 @@ async function buildReport(scope: GlobalFilters, day: string) {
   const financialOnlyScope = Boolean(
     scope.company || scope.salesperson || scope.salesTeam || scope.source || scope.mainCategory,
   );
-  const [rawResult, movement, links, dayCoverage, monthCoverage] = await Promise.all([
+  const [rawResult, movement, links, dayCoverage, monthCoverage, closedData] = await Promise.all([
     loadCrmDateRows(scope)
       .then((rows) => ({ ok: true, rows }))
       .catch(() => ({ ok: false, rows: [] })),
@@ -78,6 +78,7 @@ async function buildReport(scope: GlobalFilters, day: string) {
       platform: scope.platform,
       account: scope.account,
     }),
+    getFiltered({ ...scope, from: day, to: day, lostDateBasis: "closed" }),
   ]);
   if (!rawResult.ok) errors.push("crm_unavailable");
   if (!links.ok) errors.push("paid_links_unavailable_or_stale");
@@ -103,6 +104,7 @@ async function buildReport(scope: GlobalFilters, day: string) {
       campaignKey: row["Campaign ID"] ? "id:" + row["Campaign ID"] : undefined,
     }));
   let losses: DailyLoss[] = [];
+  let lossBasis: "chatter_events" | "crm_lost_date" | "unavailable" = "chatter_events";
   let lostReady = movement?.availability === "available";
   if (lostReady && movement) {
     // Exclusion must check both source and internal segment, including older-created records.
@@ -126,7 +128,51 @@ async function buildReport(scope: GlobalFilters, day: string) {
       lostReady = false;
     }
   }
-  if (!lostReady) errors.push("lost_event_evidence_unavailable");
+  const chatterAvailable = lostReady;
+  const trackedLostDay = chatterAvailable
+    ? buildDailyUpdates({
+        day,
+        entries: [],
+        losses,
+        payments: [],
+        spend: [],
+        availability: {
+          crm: false,
+          lost: true,
+          revenue: false,
+          links: false,
+          daySpend: false,
+          monthSpend: false,
+        },
+      }).totals.lostDay
+    : null;
+  // Keep the main measure identical to /lost's close-date workspace, regardless
+  // of Chatter permissions. Event history is separate optional evidence.
+  lostReady = false;
+  losses = [];
+  let fallbackDateCount = 0;
+  if (
+    closedData.snapshot.health?.lostAuthority &&
+    closedData.snapshot.health.lostAuthority !== "unavailable" &&
+    fresh(src("lost"))
+  ) {
+    losses = authoritativeLostLeads(closedData).map((r) => ({
+      id: r.id,
+      course: r.course,
+      date: r.closeDate,
+      recordType: r.recordType,
+      name: r.contact,
+      source: r.source,
+      segment: r.leadSegment,
+      url: odoo + "/web#id=" + encodeURIComponent(r.id) + "&model=crm.lead&view_type=form",
+    }));
+    fallbackDateCount = authoritativeLostLeads(closedData).filter(
+      (r) => !["lost_verification_date", "date_closed"].includes(r.lostDateBasis),
+    ).length;
+    lostReady = true;
+    lossBasis = "crm_lost_date";
+  } else if (!lostReady) lossBasis = "unavailable";
+  if (!lostReady) errors.push("lost_date_source_unavailable");
   const orderLinks = new Map<string, Set<string>>();
   for (const row of links.rows) {
     const ids = orderLinks.get(row.sale_order_name) || new Set<string>();
@@ -185,6 +231,10 @@ async function buildReport(scope: GlobalFilters, day: string) {
     errors,
     financialOnlyScope,
     ambiguousOrderLinks,
+    lossBasis,
+    chatterAvailable,
+    trackedLostDay,
+    fallbackDateCount,
     lossEvidenceCoverage: {
       ambiguousEvents: movement?.ambiguousEvents ?? null,
       archiveWithoutLostEvidence: movement?.unknownArchiveEvents ?? null,
@@ -196,7 +246,7 @@ async function buildReport(scope: GlobalFilters, day: string) {
     coverage: { day: dayCoverage, month: monthCoverage },
     sources: {
       crmReadAt: rawResult.ok ? new Date().toISOString() : "",
-      lostReadAt: movement?.fetchedAt || "",
+      lostReadAt: src("lost"),
       revenueSyncedAt,
       linksSyncedAt: String(links.rows[0]?.refreshed_at || ""),
       adsSyncedAt: data.snapshot.syncedAt,

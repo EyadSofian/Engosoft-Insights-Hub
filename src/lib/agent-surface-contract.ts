@@ -1290,7 +1290,7 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
         endpoint: "/api/daily-updates",
         as: "root",
         required: true,
-        why: "Cairo-day live CRM entries and tracked Lost movement with exact paid-order links, existing accounting and course ad attribution.",
+        why: "Cairo-day live CRM entries and the canonical Lost workspace close-date population, exact paid-order links, existing accounting and course ad attribution. Chatter event evidence is optional and separate.",
         summaryPaths: ["day", "monthFrom", "totals", "availability", "errors", "sources"],
       },
     ],

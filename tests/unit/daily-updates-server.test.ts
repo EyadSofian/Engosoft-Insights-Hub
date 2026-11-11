@@ -9,6 +9,7 @@ const m = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/metrics.server", () => ({
   getFiltered: m.filtered,
+  authoritativeLostLeads: (d: any) => d.lost || [],
   attributedAdCourse: (r: any) => ({ course: r.course, source: "campaign_name" }),
 }));
 vi.mock("@/lib/lead-course-distribution.server", () => ({ loadCrmDateRows: m.raw }));
@@ -38,7 +39,11 @@ beforeEach(() => {
   vi.setSystemTime(new Date("2026-11-11T10:00:00Z"));
   m.filtered.mockResolvedValue({
     snapshot: {
-      tabSyncs: [{ key: "accounting", syncedAt: "2026-11-11T09:00:00Z" }],
+      tabSyncs: [
+        { key: "accounting", syncedAt: "2026-11-11T09:00:00Z" },
+        { key: "lost", syncedAt: "2026-11-11T09:00:00Z" },
+      ],
+      health: { lostAuthority: "odoo-direct" },
       syncedAt: "2026-11-11T09:00:00Z",
     },
     ads: [
@@ -91,6 +96,40 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 describe("daily server orchestration", () => {
+  it("uses the canonical current-Lost date population without claiming access to denied Chatter tracking", async () => {
+    m.movement.mockResolvedValue({ availability: "unavailable" });
+    const data = await m.filtered();
+    data.lost = [
+      {
+        id: "old",
+        course: "CFM",
+        closeDate: "2026-11-11",
+        recordType: "lead",
+        contact: "Old",
+        source: "Facebook",
+        leadSegment: "Fresh",
+        lostDateBasis: "date_closed",
+      },
+      {
+        id: "broadcast",
+        course: "CFM",
+        closeDate: "2026-11-11",
+        recordType: "opportunity",
+        contact: "Broadcast",
+        source: "Facebook",
+        leadSegment: "WhatsApp Broadcast",
+        lostDateBasis: "lost_verification_date",
+      },
+    ];
+    m.filtered.mockResolvedValue(data);
+    const { dailyUpdatesReport } = await import("@/lib/daily-updates.server");
+    const r = await dailyUpdatesReport({}, "2026-11-11");
+    expect(r.totals.lostDay).toBe(1);
+    expect(r.totals.lostLeadsDay).toBe(1);
+    expect(r.chatterAvailable).toBe(false);
+    expect(r.lossBasis).toBe("crm_lost_date");
+    expect(r.trackedLostDay).toBeNull();
+  });
   it("owns its Cairo day, preserves dimension filters and verifies source and segment exclusions", async () => {
     const { dailyUpdatesReport } = await import("@/lib/daily-updates.server");
     const r = await dailyUpdatesReport(

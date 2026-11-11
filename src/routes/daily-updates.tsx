@@ -74,7 +74,7 @@ export function DailyUpdates() {
   const title = (kind: Detail["kind"]) =>
     ({
       leads: ar ? "الليدز التي دخلت" : "Created leads",
-      lost: ar ? "اتعملت Lost في اليوم" : "Marked Lost in the day",
+      lost: ar ? "حالات Lost بتاريخ اليوم" : "Lost records dated in the day",
       paid: ar ? "ليدز تحولت لدفع مثبت" : "Leads with evidenced payment",
       invoices: ar ? "بنود التحصيل" : "Collection lines",
     })[kind];
@@ -199,7 +199,7 @@ export function DailyUpdates() {
               "leads",
             )}
             {kpi(
-              ar ? "اتعمل Lost اليوم" : "Marked Lost in the day",
+              ar ? "Lost بتاريخ اليوم" : "Lost dated in the day",
               number(data.totals.lostDay),
               ar
                 ? `ليدز ${number(data.totals.lostLeadsDay)} · فرص ${number(data.totals.lostOpportunitiesDay)} · يشمل إنشاء أقدم`
@@ -230,6 +230,27 @@ export function DailyUpdates() {
               true,
             )}
           </div>
+          <Notice tone="info">
+            {ar
+              ? "اللوست هنا بنفس تعريف تقرير Lost: سجلات حالتها الحالية Lost وتاريخ خسارتها داخل اليوم؛ يشمل عملاء دخلوا قبل اليوم. ليس حصرًا لكل انتقالات Chatter أو العملاء الذين اتعمل لهم Lost ثم اتفتحوا من جديد."
+              : "Lost uses the same definition as the Lost workspace: currently-Lost records with a loss date inside the day, including older entries. It is not a census of all Chatter transitions or reopened records."}
+            {!data.chatterAvailable && (
+              <span className="block">
+                {ar
+                  ? "تتبّع Chatter غير متاح لحساب الربط الحالي؛ لم نغيّر الصلاحيات أو نخمن أحداثًا."
+                  : "Chatter tracking is unavailable to the current integration account; no permissions were changed and no events were guessed."}
+              </span>
+            )}
+            {(data.fallbackDateCount || 0) > 0 && (
+              <span className="block">
+                {ar
+                  ? fmtNum(data.fallbackDateCount) +
+                    " حالة تستخدم تاريخًا بديلًا حسب سياسة Lost الحالية."
+                  : fmtNum(data.fallbackDateCount) +
+                    " records use a fallback date under the existing Lost policy."}
+              </span>
+            )}
+          </Notice>
           <div className="flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-text-muted">
             <span>
               {ar ? "قراءة التقرير" : "Report read"}: {fmtDateTime(data.generatedAt, lang)}
@@ -265,8 +286,8 @@ export function DailyUpdates() {
             0 && (
             <Notice tone="info">
               {ar
-                ? "حركة Lost المعروضة مقتصرة على أحداث Chatter المؤكدة. توجد أحداث أو أرشفة بلا دليل Lost حاسم لم نضفها تخمينًا."
-                : "Lost movement includes confirmed Chatter events only. Ambiguous events or archives without conclusive Lost evidence are not guessed into the count."}
+                ? "فحص Chatter الإضافي وجد أحداثًا غير حاسمة. لا نضيفها تخمينًا، ولا نخلطها بعدد سجلات Lost بتاريخ الإغلاق المعروض."
+                : "The optional Chatter check found inconclusive events. They are not guessed into, or mixed with, the displayed current-Lost close-date count."}
             </Notice>
           )}
           <Card className="overflow-hidden !p-0">
@@ -297,7 +318,7 @@ export function DailyUpdates() {
                     {[
                       ar ? "الكورس" : "Course",
                       ar ? "دخل اليوم / الشهر" : "Entered · day / MTD",
-                      ar ? "اتعمل Lost اليوم" : "Lost in day",
+                      ar ? "Lost بتاريخ اليوم" : "Lost dated in day",
                       ar ? "تحويل لدفع موثّق · حد أدنى" : "Evidenced paid conversion · minimum",
                       ar ? "صرف اليوم" : "Day ad spend",
                       ar ? "ROAS اليوم / الشهر" : "ROAS · day / MTD",
@@ -344,8 +365,8 @@ export function DailyUpdates() {
               </p>
               <p>
                 {ar
-                  ? "اللوست اليوم: حركة مثبتة من Chatter في اليوم حتى لو العميل دخل قبل كده. نسبة اللوست أسفل الرقم تخص فقط ليدز دخلت في اليوم وحالتها الحالية Lost؛ لا نقسم حركة لوست قديمة على ليدز جديدة."
-                  : "Day Lost: verified Chatter movement in the day, including older-created leads. The secondary loss rate uses only entries created that day that are currently Lost; old loss movements are not divided by new entries."}
+                  ? "اللوست بتاريخ اليوم: نفس تقرير Lost بتاريخ الإغلاق: date_closed لليد، وlost_verification_date للفرصة مع بدائل السياسة الحالية المعلنة. النسبة أسفل الرقم تخص فقط ليدز دخلت في اليوم وحالتها الحالية Lost؛ لا نقسم لوست لعملاء أقدم على ليدز جديدة."
+                  : "Day-dated Lost matches the Lost close-date workspace: Lead date_closed and Opportunity lost_verification_date, with the existing disclosed fallback policy. The secondary rate uses only entries created that day that are currently Lost; older losses are not divided by new entries."}
               </p>
               <p>
                 {ar
@@ -474,8 +495,8 @@ export function DailyUpdates() {
               {detail?.kind === "lost" && (
                 <p className="text-xs text-text-muted">
                   {ar
-                    ? "في تقرير Lost اختر «حركة Lost · تاريخ الإغلاق». الجدول هنا يعرض حركة Chatter الموثقة لليوم."
-                    : "In Lost, choose the movement/close-date view. This table uses the day’s verified Chatter movement."}
+                    ? "في تقرير Lost اختر «حركة Lost · تاريخ الإغلاق». هذه سجلات حالتها الحالية Lost بتاريخ خسارة داخل اليوم، وليست كل انتقالات Chatter."
+                    : "In Lost, choose the movement/close-date view. These are currently-Lost records dated in the day, not every Chatter transition."}
                 </p>
               )}
             </DialogContent>
