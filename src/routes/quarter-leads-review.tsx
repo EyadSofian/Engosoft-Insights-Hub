@@ -42,7 +42,7 @@ export function QuarterLeadReviewPage() {
     }
   };
   return (
-    <main className="space-y-5">
+    <div className="space-y-5">
       <header className="rounded-[1.75rem] bg-text p-6 text-surface sm:p-8">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div>
@@ -350,6 +350,11 @@ export function QuarterLeadReviewPage() {
             <div className="mt-4 space-y-3 text-xs leading-7 text-text-muted">
               <p>
                 {ar
+                  ? "تصنيف صرف الليدز يعتمد على أسماء الحملات والحسابات وقواعد الداشبورد، وليس تحققًا مستقلًا من وجهة كل إعلان. لا نوزّع صرف الحملات المختلطة بين الفورم وغيره تخمينًا؛ لذلك CPL = صرف الحملات المصنفة ÷ الفورم المبلغ عنه، وليس تكلفة ميتا المحاسبية لكل فورم على حدة."
+                  : "Lead-spend classification uses campaign/account names and dashboard rules, not independently verified ad destinations. Mixed-destination spend is not guessed into allocations: CPL is classified campaign spend divided by reported native forms, not a separately audited native-only cost allocation."}
+              </p>
+              <p>
+                {ar
                   ? "الموقع (web/con/website)، الويبينار، وحملات الوعي والترافيك والبراندنج مستبعدة من صرف الليدز. الأهداف المجهولة لا تُعامل كحملات ليدز. ملف Excel يضم تدقيق الحملات المستبعدة وسبب استبعادها."
                   : "Website (web/con/website), webinars, awareness, traffic and branding campaigns are excluded from lead spend. Unknown objectives are not assumed to be lead campaigns. Excel includes the excluded-campaign audit and reason."}
               </p>
@@ -377,6 +382,6 @@ export function QuarterLeadReviewPage() {
           </details>
         </>
       )}
-    </main>
+    </div>
   );
 }

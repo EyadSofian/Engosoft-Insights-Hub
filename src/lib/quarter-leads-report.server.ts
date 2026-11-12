@@ -73,7 +73,10 @@ async function read(scope: GlobalFilters) {
     ),
   ]);
   const tikNative = new Map(
-    tik.rows.map((r) => [r.date + "\0" + r.adId + "\0" + r.accountId, r.formLeads]),
+    tik.rows.map((r) => [
+      r.date + "\0" + r.adId + "\0" + r.accountId,
+      r.formMetricAvailable === false ? null : r.formLeads,
+    ]),
   );
   const ads = data.ads.map((a) => ({
     month: a.date.slice(0, 7),
@@ -171,6 +174,8 @@ async function read(scope: GlobalFilters) {
         "Meta native forms; Snapchat native leads; TikTok form metric only; Google not asserted as native",
       payments: "Accounting paid lines + exact sale.order.opportunity_id",
       lifecycle: "Creation to recorded Won/Lost date; dated samples only",
+      spendClassification:
+        "Dashboard campaign/account naming classification, not independently verified API destination. Mixed-destination campaign costs are not apportioned between native forms and other conversions.",
     },
   };
 }

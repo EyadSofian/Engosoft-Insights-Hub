@@ -80,4 +80,23 @@ describe("quarter review sources", () => {
     expect(r.months[0].nativeComplete).toBe(false);
     expect(JSON.stringify(r)).not.toContain("private upstream");
   });
+  it("does not treat an omitted TikTok form metric as a reported zero", async () => {
+    m.tik.mockResolvedValue({
+      configured: true,
+      errors: [],
+      rows: [
+        {
+          date: "2026-08-01",
+          adId: "a",
+          accountId: "acc",
+          formLeads: 0,
+          formMetricAvailable: false,
+        },
+      ],
+    });
+    const { quarterLeadReview } = await import("@/lib/quarter-leads-report.server");
+    const r = await quarterLeadReview({});
+    expect(r.months[0].nativeLeads).toBeNull();
+    expect(r.months[0].nativeComplete).toBe(false);
+  });
 });

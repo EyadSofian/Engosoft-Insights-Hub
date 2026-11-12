@@ -78,6 +78,8 @@ export interface TikTokAdDaily {
   clicks: number;
   conversions: number;
   formLeads: number;
+  /** Distinguish a reported zero from an omitted/non-numeric native-form metric. */
+  formMetricAvailable?: boolean;
   viewCompletions: number;
   syncedAt: string;
 }
@@ -433,6 +435,12 @@ async function fetchTikTokAdsUncached(): Promise<TikTokFetchResult> {
         clicks: numberOf(metrics.clicks),
         conversions: numberOf(metrics.conversion),
         formLeads: numberOf(metrics.form),
+        formMetricAvailable:
+          metrics.form !== null &&
+          metrics.form !== undefined &&
+          String(metrics.form).trim() !== "" &&
+          Number.isFinite(Number(metrics.form)) &&
+          Number(metrics.form) >= 0,
         viewCompletions: numberOf(metrics.video_views_p100),
         syncedAt,
       });

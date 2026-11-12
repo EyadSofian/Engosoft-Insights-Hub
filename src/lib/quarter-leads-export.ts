@@ -198,6 +198,13 @@ export function quarterReviewWorkbook(report: QuarterLeadReviewReport, lang: "ar
         "Website web/con/website; webinar; social/awareness/branding/traffic; unknown objectives. Lead denominators also exclude Recommendation, WhatsApp Broadcast, AutoDialer Broadcast.",
       ],
       [
+        t("تصنيف الصرف", "Spend classification"),
+        t(
+          "تصنيف بأسماء الحملات والحسابات وقواعد الداشبورد، وليس تحققًا مستقلًا من وجهة كل إعلان. CPL = صرف الحملات المصنفة ÷ الفورم المبلغ عنه؛ لا يُوزّع صرف الحملات المختلطة على وجهاتها تخمينًا.",
+          "Campaign/account naming and dashboard rules, not independently verified ad destinations. CPL = classified campaign spend / reported native forms; mixed-destination costs are not guessed into native-only allocations.",
+        ),
+      ],
+      [
         t("القيم الفارغة", "Blanks"),
         t(
           "غير متاح أو المقام صفر؛ ليست نتيجة صفر.",
