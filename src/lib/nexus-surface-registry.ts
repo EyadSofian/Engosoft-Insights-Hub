@@ -957,6 +957,22 @@ export const NEXUS_SURFACES: NexusSurfaceManifest[] = [
     ],
   },
   {
+    id: "quarter_leads_review",
+    route: "/quarter-leads-review",
+    title: q("تقرير الليدز 8–10 · مؤقت", "Aug–Oct leads · temporary"),
+    description: q(
+      "حملات الليدز فقط ومجموعات دخول أغسطس–أكتوبر حتى تاريخ القراءة.",
+      "Lead-only spend and August–October creation cohorts through the read date.",
+    ),
+    tabs: [],
+    sections: [],
+    elements: [],
+    suggestedQuestions: [
+      q("قارن تكلفة الفورم بين الشهور", "Compare native form costs by month"),
+      q("أي كورس ومنصة عندهم أعلى Lost؟", "Which course/platform has the highest Lost rate?"),
+    ],
+  },
+  {
     id: "social_media",
     route: "/social-media",
     title: q("السوشيال ميديا", "Social media"),

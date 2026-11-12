@@ -32,6 +32,7 @@ import { Route as NumberReviewRouteImport } from './routes/number-review'
 import { Route as OrganicRouteImport } from './routes/organic'
 import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as ProductsRouteImport } from './routes/products'
+import { Route as QuarterLeadsReviewRouteImport } from './routes/quarter-leads-review'
 import { Route as SalesRouteImport } from './routes/sales'
 import { Route as SocialMediaRouteImport } from './routes/social-media'
 import { Route as TeamsRouteImport } from './routes/teams'
@@ -84,6 +85,7 @@ import { Route as ApiOverviewRevenueSourceRouteImport } from './routes/api/overv
 import { Route as ApiProductsRouteImport } from './routes/api/products'
 import { Route as ApiProfitabilityRouteImport } from './routes/api/profitability'
 import { Route as ApiProfitabilityLedgerRouteImport } from './routes/api/profitability-ledger'
+import { Route as ApiQuarterLeadsReviewRouteImport } from './routes/api/quarter-leads-review'
 import { Route as ApiRefreshRouteImport } from './routes/api/refresh'
 import { Route as ApiRevenueCohortsRouteImport } from './routes/api/revenue-cohorts'
 import { Route as ApiSalesRouteImport } from './routes/api/sales'
@@ -258,6 +260,11 @@ const PricingRoute = PricingRouteImport.update({
 const ProductsRoute = ProductsRouteImport.update({
   id: '/products',
   path: '/products',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const QuarterLeadsReviewRoute = QuarterLeadsReviewRouteImport.update({
+  id: '/quarter-leads-review',
+  path: '/quarter-leads-review',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SalesRoute = SalesRouteImport.update({
@@ -523,6 +530,11 @@ const ApiProfitabilityRoute = ApiProfitabilityRouteImport.update({
 const ApiProfitabilityLedgerRoute = ApiProfitabilityLedgerRouteImport.update({
   id: '/api/profitability-ledger',
   path: '/api/profitability-ledger',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiQuarterLeadsReviewRoute = ApiQuarterLeadsReviewRouteImport.update({
+  id: '/api/quarter-leads-review',
+  path: '/api/quarter-leads-review',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiRefreshRoute = ApiRefreshRouteImport.update({
@@ -866,6 +878,7 @@ export interface FileRoutesByFullPath {
   '/organic': typeof OrganicRoute
   '/pricing': typeof PricingRoute
   '/products': typeof ProductsRoute
+  '/quarter-leads-review': typeof QuarterLeadsReviewRoute
   '/sales': typeof SalesRoute
   '/social-media': typeof SocialMediaRoute
   '/teams': typeof TeamsRoute
@@ -918,6 +931,7 @@ export interface FileRoutesByFullPath {
   '/api/products': typeof ApiProductsRoute
   '/api/profitability': typeof ApiProfitabilityRoute
   '/api/profitability-ledger': typeof ApiProfitabilityLedgerRoute
+  '/api/quarter-leads-review': typeof ApiQuarterLeadsReviewRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/revenue-cohorts': typeof ApiRevenueCohortsRoute
   '/api/sales': typeof ApiSalesRoute
@@ -1003,6 +1017,7 @@ export interface FileRoutesByTo {
   '/organic': typeof OrganicRoute
   '/pricing': typeof PricingRoute
   '/products': typeof ProductsRoute
+  '/quarter-leads-review': typeof QuarterLeadsReviewRoute
   '/sales': typeof SalesRoute
   '/social-media': typeof SocialMediaRoute
   '/teams': typeof TeamsRoute
@@ -1055,6 +1070,7 @@ export interface FileRoutesByTo {
   '/api/products': typeof ApiProductsRoute
   '/api/profitability': typeof ApiProfitabilityRoute
   '/api/profitability-ledger': typeof ApiProfitabilityLedgerRoute
+  '/api/quarter-leads-review': typeof ApiQuarterLeadsReviewRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/revenue-cohorts': typeof ApiRevenueCohortsRoute
   '/api/sales': typeof ApiSalesRoute
@@ -1141,6 +1157,7 @@ export interface FileRoutesById {
   '/organic': typeof OrganicRoute
   '/pricing': typeof PricingRoute
   '/products': typeof ProductsRoute
+  '/quarter-leads-review': typeof QuarterLeadsReviewRoute
   '/sales': typeof SalesRoute
   '/social-media': typeof SocialMediaRoute
   '/teams': typeof TeamsRoute
@@ -1193,6 +1210,7 @@ export interface FileRoutesById {
   '/api/products': typeof ApiProductsRoute
   '/api/profitability': typeof ApiProfitabilityRoute
   '/api/profitability-ledger': typeof ApiProfitabilityLedgerRoute
+  '/api/quarter-leads-review': typeof ApiQuarterLeadsReviewRoute
   '/api/refresh': typeof ApiRefreshRoute
   '/api/revenue-cohorts': typeof ApiRevenueCohortsRoute
   '/api/sales': typeof ApiSalesRoute
@@ -1280,6 +1298,7 @@ export interface FileRouteTypes {
     | '/organic'
     | '/pricing'
     | '/products'
+    | '/quarter-leads-review'
     | '/sales'
     | '/social-media'
     | '/teams'
@@ -1332,6 +1351,7 @@ export interface FileRouteTypes {
     | '/api/products'
     | '/api/profitability'
     | '/api/profitability-ledger'
+    | '/api/quarter-leads-review'
     | '/api/refresh'
     | '/api/revenue-cohorts'
     | '/api/sales'
@@ -1417,6 +1437,7 @@ export interface FileRouteTypes {
     | '/organic'
     | '/pricing'
     | '/products'
+    | '/quarter-leads-review'
     | '/sales'
     | '/social-media'
     | '/teams'
@@ -1469,6 +1490,7 @@ export interface FileRouteTypes {
     | '/api/products'
     | '/api/profitability'
     | '/api/profitability-ledger'
+    | '/api/quarter-leads-review'
     | '/api/refresh'
     | '/api/revenue-cohorts'
     | '/api/sales'
@@ -1554,6 +1576,7 @@ export interface FileRouteTypes {
     | '/organic'
     | '/pricing'
     | '/products'
+    | '/quarter-leads-review'
     | '/sales'
     | '/social-media'
     | '/teams'
@@ -1606,6 +1629,7 @@ export interface FileRouteTypes {
     | '/api/products'
     | '/api/profitability'
     | '/api/profitability-ledger'
+    | '/api/quarter-leads-review'
     | '/api/refresh'
     | '/api/revenue-cohorts'
     | '/api/sales'
@@ -1692,6 +1716,7 @@ export interface RootRouteChildren {
   OrganicRoute: typeof OrganicRoute
   PricingRoute: typeof PricingRoute
   ProductsRoute: typeof ProductsRoute
+  QuarterLeadsReviewRoute: typeof QuarterLeadsReviewRoute
   SalesRoute: typeof SalesRoute
   SocialMediaRoute: typeof SocialMediaRoute
   TeamsRoute: typeof TeamsRoute
@@ -1744,6 +1769,7 @@ export interface RootRouteChildren {
   ApiProductsRoute: typeof ApiProductsRoute
   ApiProfitabilityRoute: typeof ApiProfitabilityRoute
   ApiProfitabilityLedgerRoute: typeof ApiProfitabilityLedgerRoute
+  ApiQuarterLeadsReviewRoute: typeof ApiQuarterLeadsReviewRoute
   ApiRefreshRoute: typeof ApiRefreshRoute
   ApiRevenueCohortsRoute: typeof ApiRevenueCohortsRoute
   ApiSalesRoute: typeof ApiSalesRoute
@@ -1967,6 +1993,13 @@ declare module '@tanstack/react-router' {
       path: '/products'
       fullPath: '/products'
       preLoaderRoute: typeof ProductsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/quarter-leads-review': {
+      id: '/quarter-leads-review'
+      path: '/quarter-leads-review'
+      fullPath: '/quarter-leads-review'
+      preLoaderRoute: typeof QuarterLeadsReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/sales': {
@@ -2331,6 +2364,13 @@ declare module '@tanstack/react-router' {
       path: '/api/profitability-ledger'
       fullPath: '/api/profitability-ledger'
       preLoaderRoute: typeof ApiProfitabilityLedgerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/quarter-leads-review': {
+      id: '/api/quarter-leads-review'
+      path: '/api/quarter-leads-review'
+      fullPath: '/api/quarter-leads-review'
+      preLoaderRoute: typeof ApiQuarterLeadsReviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/refresh': {
@@ -2780,6 +2820,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrganicRoute: OrganicRoute,
   PricingRoute: PricingRoute,
   ProductsRoute: ProductsRoute,
+  QuarterLeadsReviewRoute: QuarterLeadsReviewRoute,
   SalesRoute: SalesRoute,
   SocialMediaRoute: SocialMediaRoute,
   TeamsRoute: TeamsRoute,
@@ -2832,6 +2873,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiProductsRoute: ApiProductsRoute,
   ApiProfitabilityRoute: ApiProfitabilityRoute,
   ApiProfitabilityLedgerRoute: ApiProfitabilityLedgerRoute,
+  ApiQuarterLeadsReviewRoute: ApiQuarterLeadsReviewRoute,
   ApiRefreshRoute: ApiRefreshRoute,
   ApiRevenueCohortsRoute: ApiRevenueCohortsRoute,
   ApiSalesRoute: ApiSalesRoute,

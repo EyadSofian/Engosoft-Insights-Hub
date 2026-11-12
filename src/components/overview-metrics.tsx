@@ -55,6 +55,9 @@ export interface OriginCohort {
 }
 
 export interface CourseSaleContribution {
+  spend?: number | null;
+  crmCpl?: number | null;
+  cpc?: number | null;
   course: string;
   mainCategory: string;
   revenue: number;

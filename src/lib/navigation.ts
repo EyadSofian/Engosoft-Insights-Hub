@@ -116,6 +116,12 @@ export const NAVIGATION_SECTIONS: NavigationSection[] = [
         tabLabel: { ar: "دايلي أبديتس", en: "Daily Updates" },
       },
       {
+        to: "/quarter-leads-review",
+        key: "business_analytics",
+        icon: CalendarRange,
+        tabLabel: { ar: "تقرير 8–10 · مؤقت", en: "Aug–Oct review · temporary" },
+      },
+      {
         to: "/yoy",
         key: "yoy",
         icon: CalendarRange,

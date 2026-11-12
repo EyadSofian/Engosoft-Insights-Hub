@@ -62,7 +62,8 @@ describe("navigation", () => {
      * with no second strip inside the page. Marketing and CRM carry the most
      * because their audiences genuinely work across that many reports.
      */
-    const cap: Record<string, number> = { marketing: 6, leads: 5, crm: 7 };
+    // Management includes the explicitly requested temporary Aug–Oct review.
+    const cap: Record<string, number> = { overview: 5, marketing: 6, leads: 5, crm: 7 };
     for (const section of NAVIGATION_SECTIONS.filter((entry) => entry.contextual === "tabs")) {
       expect(section.items.length, section.id).toBeLessThanOrEqual(cap[section.id] ?? 4);
     }

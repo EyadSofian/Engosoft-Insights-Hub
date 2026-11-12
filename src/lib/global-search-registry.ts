@@ -23,6 +23,29 @@ const MONEY = ["money", "فلوس", "flous", "filos", "مبلغ", "مال", "cas
 
 export const SEARCH_DESTINATIONS: SearchDestination[] = [
   {
+    id: "quarter-leads-review",
+    title: "Aug–Oct 2026 lead review",
+    titleAr: "تقرير الليدز أغسطس سبتمبر أكتوبر 2026",
+    route: "/quarter-leads-review",
+    category: "report",
+    hint: {
+      ar: "تقرير مؤقت للصرف والتحويل ودورة حياة الكورس",
+      en: "Temporary spend, conversion and course-lifecycle review",
+    },
+    keywords: [
+      "August",
+      "September",
+      "October",
+      "أغسطس",
+      "سبتمبر",
+      "أكتوبر",
+      "تقرير مؤقت",
+      "pure leads",
+      "بيور ليد",
+      "quarter review",
+    ],
+  },
+  {
     id: "daily-updates",
     title: "Daily Updates",
     titleAr: "دايلي أبديتس",

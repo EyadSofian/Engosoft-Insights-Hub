@@ -86,6 +86,34 @@ export const Route = createFileRoute("/api/overview")({
         const courseSales = soldCourses.map((course) => {
           const attribution = computeRevenueLeadAttribution(data, prevData, course.course);
           return {
+            spend:
+              spendCoverage.complete &&
+              !filters.company &&
+              !filters.salesperson &&
+              !filters.salesTeam &&
+              !filters.source &&
+              !filters.mainCategory
+                ? course.spend
+                : null,
+            crmCpl:
+              spendCoverage.complete &&
+              !filters.company &&
+              !filters.salesperson &&
+              !filters.salesTeam &&
+              !filters.source &&
+              !filters.mainCategory &&
+              course.crmLeads > 0
+                ? course.spend / course.crmLeads
+                : null,
+            cpc:
+              spendCoverage.complete &&
+              !filters.company &&
+              !filters.salesperson &&
+              !filters.salesTeam &&
+              !filters.source &&
+              !filters.mainCategory
+                ? course.cpc
+                : null,
             course: course.course,
             mainCategory: course.mainCategory,
             revenue: course.revenue,

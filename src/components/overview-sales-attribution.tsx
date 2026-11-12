@@ -621,6 +621,18 @@ export function OverviewSalesAttribution({
 
             <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-border/70 pt-3">
               <div>
+                <dt className="text-[12px] text-text-muted">{A ? "الصرف" : "Spend"}</dt>
+                <dd className="num mt-0.5 font-semibold">{fmtUSDFull(course.spend ?? null)}</dd>
+              </div>
+              <div>
+                <dt className="text-[12px] text-text-muted">CPL · CRM</dt>
+                <dd className="num mt-0.5 font-semibold">{fmtUSDFull(course.crmCpl ?? null)}</dd>
+              </div>
+              <div>
+                <dt className="text-[12px] text-text-muted">CPC</dt>
+                <dd className="num mt-0.5 font-semibold">{fmtUSDFull(course.cpc ?? null)}</dd>
+              </div>
+              <div>
                 <dt className="text-[12px] text-text-muted">
                   {A ? "ليدز / مكسوب" : "Leads / won"}
                 </dt>
@@ -682,22 +694,27 @@ export function OverviewSalesAttribution({
       </div>
 
       <div className="table-wrap scroll-hint-x mt-5 hidden rounded-xl border border-border md:block">
-        <table className="mx-auto w-full min-w-[880px] max-w-[1400px] table-fixed text-[12px]">
+        <table className="mx-auto w-full min-w-[1150px] text-[12px]">
           <caption className="sr-only">
             {A ? "التحصيل ومصدره ومعدل إغلاق كل دورة" : "Collection source and closure by course"}
           </caption>
-          <colgroup>
-            <col className="w-[16%]" />
-            <col className="w-[18%]" />
-            <col className="w-[15%]" />
-            <col className="w-[13%]" />
-            <col className="w-[14%]" />
-            <col className="w-[24%]" />
-          </colgroup>
           <thead>
             <tr className="border-b border-border bg-surface-2/70 text-text-muted">
               <th scope="col" className="px-3 py-3 text-start font-semibold">
                 {A ? "الدورة" : "Course"}
+              </th>
+              <th className="px-3 py-3 text-end font-semibold">{A ? "الصرف" : "Spend"}</th>
+              <th
+                className="px-3 py-3 text-end font-semibold"
+                title={A ? "الصرف ÷ سجلات CRM الداخلة في الفترة" : "Spend ÷ CRM entry cohort"}
+              >
+                CPL · CRM
+              </th>
+              <th
+                className="px-3 py-3 text-end font-semibold"
+                title={A ? "الصرف ÷ كل النقرات" : "Spend ÷ all clicks"}
+              >
+                CPC
               </th>
               <th scope="col" className="px-3 py-3 text-end font-semibold">
                 {A ? "التحصيل" : "Collected"}
@@ -727,6 +744,9 @@ export function OverviewSalesAttribution({
                     {course.course}
                   </bdi>
                 </td>
+                <td className="num px-3 py-3 text-end">{fmtUSDFull(course.spend ?? null)}</td>
+                <td className="num px-3 py-3 text-end">{fmtUSDFull(course.crmCpl ?? null)}</td>
+                <td className="num px-3 py-3 text-end">{fmtUSDFull(course.cpc ?? null)}</td>
                 <td className="num px-3 py-3 text-end font-semibold text-text">
                   <span className="inline-flex items-baseline gap-1.5 whitespace-nowrap" dir="ltr">
                     <span>{fmtUSD(course.revenue)}</span>

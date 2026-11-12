@@ -107,6 +107,7 @@ export function pageTypeFor(path: string): NexusPageType {
     // and answers the same owners' questions, one month at a time.
     "management-review": "overview",
     "daily-updates": "overview",
+    "quarter-leads-review": "overview",
     pricing: "pricing",
     weekend: "weekend",
     "media-plan": "media_plan",
