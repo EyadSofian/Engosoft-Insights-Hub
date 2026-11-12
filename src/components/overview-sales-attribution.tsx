@@ -589,6 +589,11 @@ export function OverviewSalesAttribution({
         </span>
       </div>
 
+      <p className="mt-4 text-[12px] leading-6 text-text-muted">
+        {A
+          ? "الصرف بنفس إسناد الدورة في الداشبورد. CPL · CRM = الصرف ÷ سجلات الدخول، وCPC = الصرف ÷ كل النقرات. القيم غير المتاحة أو غير القابلة للتوزيع على فلاتر البائع/الشركة لا تُفترض صفرًا."
+          : "Spend follows dashboard course attribution. CPL · CRM = spend ÷ CRM entries; CPC = spend ÷ all clicks. Missing costs or costs not allocatable to seller/company filters are not assumed zero."}
+      </p>
       <div className="mt-5 grid gap-2 md:hidden">
         {courses.map((course) => (
           <article

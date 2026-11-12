@@ -203,6 +203,19 @@ export function QuarterLeadReviewPage() {
               ? "ليدز المنصات أعداد أحداث فورم، وليست عدد أشخاص CRM الفريدين. أعداد Won/Lost نسبتها من مجموعة CRM، وليس من الفورم المجمّع. إيراد المجموعة مربوط بمعرف Opportunity وأمر البيع، ويشمل التحصيل اللاحق؛ غير المرتبط لا نُسنده تخمينًا."
               : "Native platform leads are form events, not distinct CRM people. Won/Lost rates use the CRM cohort, not aggregate forms. Cohort revenue uses exact Opportunity/order links and includes later collections; unlinked sales are not guessed into a cohort."}
           </Notice>
+          <Notice tone="info">
+            {ar
+              ? "دليل فورم مباشر على سجلات CRM: " +
+                fmtNum(data.coverage.nativeProvenCrm) +
+                " من " +
+                fmtNum(data.coverage.cohortIds) +
+                ". باقي السجلات محسوبة من مصدر المنصة، لكنه وحده لا يثبت نموذج Native؛ لذلك تحويل Won وROAS المعروضين تخص مجموعة CRM المدفوعة، وليس ادعاء ربط كل حدث فورم بفرد."
+              : "Direct form evidence on CRM records: " +
+                fmtNum(data.coverage.nativeProvenCrm) +
+                " of " +
+                fmtNum(data.coverage.cohortIds) +
+                ". Other records are scoped by paid-platform source, which alone does not prove a native form. Won conversion and ROAS therefore describe the paid CRM cohort, not a proven person-level link for every form event."}
+          </Notice>
           {!data.tiktokNativeReady && (
             <Notice tone="warning">
               {ar
