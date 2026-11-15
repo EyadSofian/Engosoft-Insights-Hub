@@ -145,9 +145,23 @@ export function buildDailyUpdates(input: {
     const spendDay = adRows.filter((r) => r.date === day).reduce((s, r) => s + r.spend, 0);
     const spendMonth = adRows.reduce((s, r) => s + r.spend, 0);
     const cohortLost = dayEntries.filter((r) => r.status === "lost");
+    const monthCohortLost = monthEntries.filter((r) => r.status === "lost");
+    const dayWon = dayEntries.filter((r) => r.status === "won");
+    const monthWon = monthEntries.filter((r) => r.status === "won");
     return {
       leadsDay: availability.crm ? dayEntries.length : null,
       leadsMonth: availability.crm ? monthEntries.length : null,
+      cplDay: availability.crm && availability.daySpend ? ratio(spendDay, dayEntries.length) : null,
+      cplMonth:
+        availability.crm && availability.monthSpend ? ratio(spendMonth, monthEntries.length) : null,
+      wonDay: availability.crm ? dayWon.length : null,
+      wonMonth: availability.crm ? monthWon.length : null,
+      closureRateDay: availability.crm
+        ? ratio(dayWon.length, dayWon.length + cohortLost.length)
+        : null,
+      closureRateMonth: availability.crm
+        ? ratio(monthWon.length, monthWon.length + monthCohortLost.length)
+        : null,
       lostDay: availability.lost ? dayLosses.length : null,
       lostLeadsDay: availability.lost
         ? dayLosses.filter((r) => r.recordType === "lead").length
@@ -156,7 +170,11 @@ export function buildDailyUpdates(input: {
         ? dayLosses.filter((r) => r.recordType === "opportunity").length
         : null,
       cohortLostDay: availability.crm ? cohortLost.length : null,
+      cohortLostMonth: availability.crm ? monthCohortLost.length : null,
       cohortLostRate: availability.crm ? ratio(cohortLost.length, dayEntries.length) : null,
+      cohortLostRateMonth: availability.crm
+        ? ratio(monthCohortLost.length, monthEntries.length)
+        : null,
       paidDayCohort:
         availability.crm && availability.links && availability.revenue ? dayConverted.length : null,
       paidMonthCohort:

@@ -7,10 +7,6 @@ import {
   ChevronDown,
   RefreshCw,
   Search,
-  Users,
-  TrendingDown,
-  Wallet,
-  ChartNoAxesCombined,
   Download,
 } from "lucide-react";
 import { Card, Notice, Skeleton } from "@/components/ui-bits";
@@ -23,7 +19,11 @@ import { useModalGuard } from "@/lib/ui-store";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
 
 export const Route = createFileRoute("/daily-updates")({ component: DailyUpdates });
-type Detail = { course: string; kind: "leads" | "lost" | "paid" | "invoices"; month: boolean };
+type Detail = {
+  course: string;
+  kind: "leads" | "won" | "cohortLost" | "lost" | "paid" | "invoices";
+  month: boolean;
+};
 const todayCairo = () =>
   new Intl.DateTimeFormat("en-CA", {
     timeZone: "Africa/Cairo",
@@ -71,12 +71,11 @@ export function DailyUpdates() {
     refetchOnMount: "always",
   });
   const data = query.data;
-  const number = (n: number | null) => (n === null ? "—" : fmtNum(n));
-  const percent = (n: number | null) => (n === null ? "—" : fmtPct(n * 100));
-  const ratio = (n: number | null) => (n === null ? "—" : fmtRoas(n));
   const title = (kind: Detail["kind"]) =>
     ({
       leads: ar ? "الليدز التي دخلت" : "Created leads",
+      won: ar ? "سجلات المجموعة الناجحة حاليًا" : "Currently Won cohort records",
+      cohortLost: ar ? "سجلات المجموعة المفقودة حاليًا" : "Currently Lost cohort records",
       lost: ar ? "حالات Lost بتاريخ اليوم" : "Lost records dated in the day",
       paid: ar ? "ليدز تحولت لدفع مثبت" : "Leads with evidenced payment",
       invoices: ar ? "بنود التحصيل" : "Collection lines",
@@ -109,35 +108,17 @@ export function DailyUpdates() {
   const detailRows =
     !data || !detail
       ? []
-      : data.details[detail.kind].filter(
+      : data.details[
+          detail.kind === "won" || detail.kind === "cohortLost" ? "leads" : detail.kind
+        ].filter(
           (r) =>
+            (detail.kind !== "won" || ("status" in r && r.status === "won")) &&
+            (detail.kind !== "cohortLost" || ("status" in r && r.status === "lost")) &&
             (detail.course === "__all" ||
               dailyCourseKey(r.course) === dailyCourseKey(detail.course)) &&
             (detail.month ||
               ("createdAt" in r ? r.createdAt === day : "date" in r ? r.date === day : false)),
         );
-  const kpi = (
-    label: string,
-    value: string,
-    note: string,
-    Icon: typeof Users,
-    color: string,
-    kind: Detail["kind"],
-    month = false,
-  ) => (
-    <button
-      disabled={value === "—"}
-      onClick={() => open("__all", kind, month)}
-      className="rounded-2xl border border-border bg-surface p-4 text-start transition hover:border-brand disabled:cursor-default"
-    >
-      <div className="flex items-center justify-between gap-3 text-xs font-semibold text-text-muted">
-        {label}
-        <Icon size={17} className={color} />
-      </div>
-      <div className="num mt-3 text-3xl font-black tracking-tight text-text">{value}</div>
-      <p className="mt-2 text-xs leading-5 text-text-muted">{note}</p>
-    </button>
-  );
   return (
     <main className="space-y-5">
       <header className="relative overflow-hidden rounded-[1.75rem] border border-border bg-text p-6 text-surface sm:p-8">
@@ -224,53 +205,17 @@ export function DailyUpdates() {
       {query.isPending && <Skeleton className="h-72" />}
       {data && (
         <>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {kpi(
-              ar ? "ليدز دخلت اليوم" : "Leads created in the day",
-              number(data.totals.leadsDay),
-              ar
-                ? `الشهر حتى اليوم: ${number(data.totals.leadsMonth)} · Leads + Opportunities بدون تكرار الـID`
-                : `Month to date: ${number(data.totals.leadsMonth)} · distinct CRM IDs, both record types`,
-              Users,
-              "text-brand",
-              "leads",
-            )}
-            {kpi(
-              ar ? "Lost بتاريخ اليوم" : "Lost dated in the day",
-              number(data.totals.lostDay),
-              ar
-                ? `ليدز ${number(data.totals.lostLeadsDay)} · فرص ${number(data.totals.lostOpportunitiesDay)} · يشمل إنشاء أقدم`
-                : `Leads ${number(data.totals.lostLeadsDay)} · Opportunities ${number(data.totals.lostOpportunitiesDay)} · includes older entries`,
-              TrendingDown,
-              "text-danger",
-              "lost",
-            )}
-            {kpi(
-              ar ? "تحصيل اليوم" : "Day collections",
-              fmtUSDFull(data.totals.revenueDay),
-              ar
-                ? `${number(data.totals.invoicesDay)} فاتورة · حسب تاريخ الدفع`
-                : `${number(data.totals.invoicesDay)} invoices · by payment date`,
-              Wallet,
-              "text-success",
-              "invoices",
-            )}
-            {kpi(
-              ar ? "تحصيل الشهر حتى اليوم" : "Month-to-date collections",
-              fmtUSDFull(data.totals.revenueMonth),
-              ar
-                ? `ROAS الفترة: ${ratio(data.totals.roasMonth)} · ليس إسنادًا سببيًا`
-                : `Period ROAS: ${ratio(data.totals.roasMonth)} · not causal attribution`,
-              ChartNoAxesCombined,
-              "text-brand",
-              "invoices",
-              true,
-            )}
-          </div>
           <Notice tone="info">
             {ar
-              ? "اللوست هنا بنفس تعريف تقرير Lost: سجلات حالتها الحالية Lost وتاريخ خسارتها داخل اليوم؛ يشمل عملاء دخلوا قبل اليوم. ليس حصرًا لكل انتقالات Chatter أو العملاء الذين اتعمل لهم Lost ثم اتفتحوا من جديد."
-              : "Lost uses the same definition as the Lost workspace: currently-Lost records with a loss date inside the day, including older entries. It is not a census of all Chatter transitions or reopened records."}
+              ? "أعلى الخانة: اليوم المختار. أسفلها: من أول الشهر حتى اليوم المختار. Won وLost حسب الحالة الحالية لنفس مجموعة الدخول، والتحصيل حسب تاريخ الدفع."
+              : "Top value: selected day. Bottom value: month-to-date. Won and Lost are current states of the same entry cohort; revenue uses payment date."}
+            <button
+              className="ms-2 font-bold text-brand underline disabled:opacity-60"
+              disabled={data.totals.lostDay === null}
+              onClick={() => open("__all", "lost")}
+            >
+              {ar ? "حركة Lost بتاريخ الإغلاق" : "Lost movement by close date"}
+            </button>
             {!data.chatterAvailable && (
               <span className="block">
                 {ar
@@ -305,8 +250,8 @@ export function DailyUpdates() {
           {(data.errors.length > 0 || data.financialOnlyScope) && (
             <Notice tone="warning">
               {ar
-                ? "بعض المصادر أو روابط الدفع ناقصة/قديمة؛ المقاييس المتأثرة تظهر —. وفلاتر الشركة أو البائع أو المصدر لا تعني أن صرف الإعلانات موزّع عليهم، لذلك يُحجب الصرف وROAS عندها."
-                : "Some sources or paid links are unavailable/stale; affected metrics show —. Company, seller or source filters cannot allocate ad spend, so spend and ROAS are withheld for those scopes."}
+                ? "بعض المصادر أو روابط الدفع ناقصة/قديمة؛ المقاييس المتأثرة تظهر —. صرف الإعلانات مش موزّع حسب الشركة أو البائع أو المصدر، لذلك الصرف وCPL وROAS لا تظهر مع تلك الفلاتر."
+                : "Some sources or paid links are unavailable/stale; affected metrics show —. Company, seller or source filters cannot allocate ad spend, so spend, CPL and ROAS are withheld for those scopes."}
             </Notice>
           )}
           {data.unlinkedInvoices > 0 && (
@@ -333,8 +278,8 @@ export function DailyUpdates() {
                 <h2 className="text-lg font-black">{ar ? "نبض كل كورس" : "The course pulse"}</h2>
                 <p className="mt-1 text-xs text-text-muted">
                   {ar
-                    ? "اضغط رقمًا للسجلات، أو افتح الحملات تحت الكورس."
-                    : "Select a figure for records, or expand campaigns under a course."}
+                    ? "الأرقام اللي تحتها خط تفتح السجلات. اضغط اسم الكورس لعرض حملاته."
+                    : "Underlined figures open records. Select the course name for its campaigns."}
                 </p>
               </div>
               <label className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface-2 px-3">
@@ -354,15 +299,22 @@ export function DailyUpdates() {
                   <tr>
                     {[
                       ar ? "الكورس" : "Course",
-                      ar ? "دخل اليوم / الشهر" : "Entered · day / MTD",
-                      ar ? "Lost بتاريخ اليوم" : "Lost dated in day",
-                      ar ? "تحويل لدفع موثّق · حد أدنى" : "Evidenced paid conversion · minimum",
-                      ar ? "صرف اليوم" : "Day ad spend",
-                      ar ? "ROAS اليوم / الشهر" : "ROAS · day / MTD",
-                      ar ? "تحصيل اليوم / الشهر" : "Collections · day / MTD",
-                      ar ? "الحملات" : "Campaigns",
+                      ar ? "الصرف" : "Spend",
+                      ar ? "الليدز" : "Leads",
+                      "CPL",
+                      ar ? "ناجح" : "Won",
+                      "CR",
+                      ar ? "مفقود" : "Lost",
+                      ar ? "نسبة الفقد" : "Lost rate",
+                      ar ? "التحصيل" : "Revenue",
+                      ar ? "نسبة الفوز من المغلق" : "Closure rate",
+                      "ROAS",
                     ].map((h) => (
-                      <th key={h} className="px-4 py-4 text-start font-bold">
+                      <th
+                        key={h}
+                        scope="col"
+                        className="whitespace-nowrap px-3 py-4 text-start font-bold"
+                      >
                         {h}
                       </th>
                     ))}
@@ -374,7 +326,6 @@ export function DailyUpdates() {
                       key={row.key}
                       row={row}
                       ar={ar}
-                      day={day}
                       expanded={expanded === row.key}
                       toggle={() => setExpanded(expanded === row.key ? null : row.key)}
                       open={open}
@@ -402,13 +353,13 @@ export function DailyUpdates() {
               </p>
               <p>
                 {ar
-                  ? "اللوست بتاريخ اليوم: نفس تقرير Lost بتاريخ الإغلاق: date_closed لليد، وlost_verification_date للفرصة مع بدائل السياسة الحالية المعلنة. النسبة أسفل الرقم تخص فقط ليدز دخلت في اليوم وحالتها الحالية Lost؛ لا نقسم لوست لعملاء أقدم على ليدز جديدة."
-                  : "Day-dated Lost matches the Lost close-date workspace: Lead date_closed and Opportunity lost_verification_date, with the existing disclosed fallback policy. The secondary rate uses only entries created that day that are currently Lost; older losses are not divided by new entries."}
+                  ? "نسبة الفقد = المفقود ÷ الليدز في نفس مجموعة الدخول. Closure Rate = الناجح ÷ (الناجح + المفقود) لنفس المجموعة؛ المفتوح خارج المقام. حركة Lost بتاريخ الإغلاق منفصلة وقد تشمل عملاء أقدم."
+                  : "Lost rate = Lost ÷ all CRM entries in the same cohort. Closure rate = Won ÷ (Won + Lost) in that cohort; open entries are excluded. Lost movement by close date is separate and can include older entries."}
               </p>
               <p>
                 {ar
-                  ? "التحويل: عدد سجلات مجموعة الدخول المرتبطة بأوامر بيع ذات تحصيل موجب حتى اليوم ÷ عدد سجلات نفس المجموعة. يُحسب الربط بمعرف Opportunity، وليس تشابه الاسم أو عدد الفواتير. المجموعة اليومية غير الشهرية، والفاتورة المستردة بالكامل لا تُحسب كتسجيل مدفوع."
-                  : "Conversion: distinct entry-cohort IDs linked to net-positive paid orders through the chosen day ÷ the same entry-cohort size. Exact Opportunity links, not customer-name guesses or invoice counts. Day and month cohorts are separate; fully refunded orders are not paid registrations."}
+                  ? "CR = الليدز المرتبطة بأوامر بيع ذات تحصيل موجب حتى اليوم المختار ÷ الليدز في نفس مجموعة الدخول. مش كل Won معناه دفع مثبت. CPL = الصرف ÷ عدد سجلات CRM في نفس الفترة."
+                  : "CR = entries linked to net-positive paid orders through the selected day ÷ all entries in the same cohort. Won does not prove payment. CPL = ad spend ÷ CRM entries in the same period."}
               </p>
               <p>
                 {ar
@@ -547,7 +498,6 @@ export function DailyUpdates() {
 function CourseRows({
   row,
   ar,
-  day,
   expanded,
   toggle,
   open,
@@ -555,7 +505,6 @@ function CourseRows({
 }: {
   row: DailyUpdatesReport["rows"][number];
   ar: boolean;
-  day: string;
   expanded: boolean;
   toggle: () => void;
   open: (course: string, kind: Detail["kind"], month?: boolean) => void;
@@ -573,76 +522,52 @@ function CourseRows({
       {value}
     </button>
   );
+  const metric = (day: string, month: string, kind?: Detail["kind"], tone = "text-text") => (
+    <td className="whitespace-nowrap px-3 py-3">
+      <div className={`num min-h-9 font-black ${tone}`}>
+        {kind ? figure(day, kind, false, tone) : <span className="inline-block py-2">{day}</span>}
+      </div>
+      <div className="num text-xs text-text-muted">
+        {kind ? (
+          figure(month, kind, true, "text-text-muted")
+        ) : (
+          <span className="inline-block py-2">{month}</span>
+        )}
+      </div>
+    </td>
+  );
   return (
     <>
       <tr className="border-t border-border align-top hover:bg-surface-2/50">
-        <td className="px-4 py-4">
-          <p className="font-black">{courseName(row.course)}</p>
-          <p className="mt-2 text-[11px] text-text-muted">{day}</p>
-        </td>
-        <td className="px-4 py-3">
-          {figure(num(row.leadsDay), "leads")}
-          <div className="text-xs text-text-muted">
-            {ar ? "الشهر" : "MTD"}: {figure(num(row.leadsMonth), "leads", true, "text-text-muted")}
-          </div>
-        </td>
-        <td className="px-4 py-3">
-          {figure(num(row.lostDay), "lost", false, "text-danger")}
-          <div className="text-[11px] leading-6 text-text-muted">
-            {ar ? "ليدز" : "Leads"} {num(row.lostLeadsDay)} · {ar ? "فرص" : "Opp."}{" "}
-            {num(row.lostOpportunitiesDay)}
-          </div>
-          <div className="text-[11px] text-text-muted">
-            {ar ? "Lost من دخول اليوم" : "Lost of day entries"}: {num(row.cohortLostDay)} ·{" "}
-            {pct(row.cohortLostRate)}
-          </div>
-        </td>
-        <td className="px-4 py-3">
-          {figure(pct(row.conversionDay), "paid")}
-          <div className="text-[11px] text-text-muted">
-            {num(row.paidDayCohort)} / {num(row.leadsDay)} {ar ? "من دخول اليوم" : "day entries"}
-          </div>
-          <div className="mt-1 text-xs text-text-muted">
-            {ar ? "الشهر" : "MTD"}:{" "}
-            {figure(pct(row.conversionMonth), "paid", true, "text-text-muted")} (
-            {num(row.paidMonthCohort)}/{num(row.leadsMonth)})
-          </div>
-        </td>
-        <td className="num px-4 py-5 font-bold">
-          {fmtUSDFull(row.spendDay)}
-          <div className="mt-2 text-[11px] font-normal text-text-muted">
-            {ar ? "الشهر" : "MTD"}: {fmtUSDFull(row.spendMonth)}
-          </div>
-        </td>
-        <td className="num px-4 py-5 font-bold">
-          {roas(row.roasDay)}
-          <div className="mt-2 text-xs font-normal text-text-muted">
-            {ar ? "الشهر" : "MTD"}: {roas(row.roasMonth)}
-          </div>
-        </td>
-        <td className="px-4 py-3">
-          {figure(fmtUSDFull(row.revenueDay), "invoices", false, "text-success")}
-          <div className="text-xs text-text-muted">
-            {ar ? "الشهر" : "MTD"}:{" "}
-            {figure(fmtUSDFull(row.revenueMonth), "invoices", true, "text-text-muted")}
-          </div>
-        </td>
-        <td className="px-4 py-3">
+        <th scope="row" className="px-3 py-3 text-start">
           <button
             aria-expanded={expanded}
             onClick={toggle}
-            className="inline-flex min-h-10 items-center gap-1 rounded-xl border border-border px-3 text-xs font-bold"
+            className="inline-flex min-h-9 items-center gap-1 whitespace-nowrap font-black hover:text-brand"
           >
-            <span>
-              {row.campaigns.length} {ar ? "حملة" : "campaigns"}
-            </span>
+            {courseName(row.course)}
             <ChevronDown size={14} className={expanded ? "rotate-180" : ""} />
           </button>
-        </td>
+        </th>
+        {metric(fmtUSDFull(row.spendDay), fmtUSDFull(row.spendMonth))}
+        {metric(num(row.leadsDay), num(row.leadsMonth), "leads", "text-brand")}
+        {metric(fmtUSDFull(row.cplDay), fmtUSDFull(row.cplMonth))}
+        {metric(num(row.wonDay), num(row.wonMonth), "won", "text-success")}
+        {metric(pct(row.conversionDay), pct(row.conversionMonth), "paid", "text-brand")}
+        {metric(num(row.cohortLostDay), num(row.cohortLostMonth), "cohortLost", "text-danger")}
+        {metric(pct(row.cohortLostRate), pct(row.cohortLostRateMonth), undefined, "text-danger")}
+        {metric(
+          fmtUSDFull(row.revenueDay),
+          fmtUSDFull(row.revenueMonth),
+          "invoices",
+          "text-success",
+        )}
+        {metric(pct(row.closureRateDay), pct(row.closureRateMonth))}
+        {metric(roas(row.roasDay), roas(row.roasMonth))}
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={8} className="border-y border-brand/15 bg-brand-soft/20 p-5">
+          <td colSpan={11} className="border-y border-brand/15 bg-brand-soft/20 p-5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h3 className="font-bold">
                 {courseName(row.course)} ·{" "}

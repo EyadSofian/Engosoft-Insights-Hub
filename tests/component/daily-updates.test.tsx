@@ -106,6 +106,19 @@ describe("daily updates presentation", () => {
       </I18nProvider>,
     );
     expect(screen.getByRole("heading", { name: "Daily Updates" })).toBeTruthy();
+    expect(screen.getAllByRole("columnheader").map((column) => column.textContent)).toEqual([
+      "Course",
+      "Spend",
+      "Leads",
+      "CPL",
+      "Won",
+      "CR",
+      "Lost",
+      "Lost rate",
+      "Revenue",
+      "Closure rate",
+      "ROAS",
+    ]);
     expect(screen.getByText(/unambiguous Opportunity link/)).toBeTruthy();
     const tr = screen.getByText("CFM", { exact: true }).closest("tr")!;
     fireEvent.click(within(tr).getAllByRole("button", { name: "1", exact: true })[0]);
@@ -122,7 +135,7 @@ describe("daily updates presentation", () => {
         <DailyUpdates />
       </I18nProvider>,
     );
-    fireEvent.click(screen.getByRole("button", { name: "1 campaigns" }));
+    fireEvent.click(screen.getByRole("button", { name: "CFM", exact: true }));
     expect(screen.getByRole("link", { name: /CFM campaign/ }).getAttribute("href")).toBe(
       "/campaigns",
     );
@@ -131,6 +144,23 @@ describe("daily updates presentation", () => {
       target: { value: "PMP" },
     });
     expect(screen.getByText("No courses in this selection.")).toBeTruthy();
+  });
+  it("opens Won records without including open records from the same course", () => {
+    const data = fixture();
+    const won = { ...data.details.leads[0], id: "2", name: "Won customer", status: "won" };
+    data.details.leads.push(won);
+    data.rows[0].wonDay = 1;
+    query.mockReturnValue({ data, isPending: false, isFetching: false, refetch: vi.fn() });
+    render(
+      <I18nProvider>
+        <DailyUpdates />
+      </I18nProvider>,
+    );
+    const row = screen.getByRole("rowheader", { name: "CFM" }).closest("tr")!;
+    fireEvent.click(within(within(row).getAllByRole("cell")[3]).getByRole("button", { name: "1" }));
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByRole("link", { name: /Won customer/ })).toBeTruthy();
+    expect(dialog.queryByRole("link", { name: /Example record/ })).toBeNull();
   });
   it("renders Arabic copy and keeps missing Lost unavailable", () => {
     localStorage.setItem("engo_lang_v2", "ar");
@@ -144,7 +174,9 @@ describe("daily updates presentation", () => {
       </I18nProvider>,
     );
     expect(screen.getByRole("heading", { name: "دايلي أبديتس" })).toBeTruthy();
-    const card = screen.getAllByText("Lost بتاريخ اليوم", { exact: true })[0].parentElement!;
-    expect(within(card).getByText("—")).toBeTruthy();
+    const movement = screen.getByRole("button", { name: "حركة Lost بتاريخ الإغلاق" });
+    expect((movement as HTMLButtonElement).disabled).toBe(true);
+    const row = screen.getByRole("rowheader", { name: "CFM" }).closest("tr")!;
+    expect(within(row).getAllByRole("cell")[5].textContent).toBe("00");
   });
 });

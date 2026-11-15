@@ -80,6 +80,43 @@ describe("daily course brief", () => {
     });
     expect(r.totals.leadsDay).toBe(1);
   });
+  it("calculates Daily Updates KPIs using the right day/MTD cohorts and denominators", () => {
+    const r = buildDailyUpdates({
+      ...base(),
+      entries: [
+        entry("1", { status: "won" }),
+        entry("2", { status: "lost" }),
+        entry("3"),
+        entry("4", { createdAt: "2026-11-03", status: "won" }),
+      ],
+      payments: [payment()],
+      spend: [
+        {
+          course: "CFM",
+          campaign: "CFM-ad",
+          campaignKey: "id:1",
+          platform: "meta",
+          date: day,
+          spend: 60,
+          attribution: "campaign_name",
+        },
+      ],
+    });
+    expect(r.rows[0]).toMatchObject({
+      cplDay: 20,
+      cplMonth: 15,
+      wonDay: 1,
+      wonMonth: 2,
+      conversionDay: 1 / 3,
+      conversionMonth: 1 / 4,
+      cohortLostDay: 1,
+      cohortLostMonth: 1,
+      cohortLostRate: 1 / 3,
+      cohortLostRateMonth: 1 / 4,
+      closureRateDay: 1 / 2,
+      closureRateMonth: 2 / 3,
+    });
+  });
   it("counts paid conversions by exact lead/order link, not invoices or old-lead receipts", () => {
     const r = buildDailyUpdates({
       ...base(),
@@ -130,6 +167,9 @@ describe("daily course brief", () => {
     expect(r.totals.leadsDay).toBeNull();
     expect(r.totals.lostDay).toBeNull();
     expect(r.totals.conversionDay).toBeNull();
+    expect(r.totals.cplDay).toBeNull();
+    expect(r.totals.wonDay).toBeNull();
+    expect(r.totals.closureRateDay).toBeNull();
     expect(r.totals.roasDay).toBeNull();
     expect(r.totals.revenueDay).toBe(0);
     expect(buildDailyUpdates({ ...base(), entries: [] }).totals.conversionDay).toBeNull();
