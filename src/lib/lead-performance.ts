@@ -78,6 +78,8 @@ export interface PerformanceGroup {
   paidRevenue: number;
   /** Verifiable outcomes that happened in the same calendar month as entry. */
   lostSameEntryMonth: number;
+  lostLeadsSameEntryMonth: number;
+  lostOpportunitiesSameEntryMonth: number;
   lostTimingUnverified: number;
   /** Current-Lost records with a verified close date in this calendar month, regardless of entry month. */
   calendarLost: number;
@@ -239,16 +241,34 @@ type Enriched = PerformanceLead & {
   firstCallLagHours: number | null;
 };
 
-function aggregate(name: string, records: Enriched[], callsAvailable: boolean): PerformanceGroup {
+function verifiedLostDay(row: PerformanceLead, asOf: string): string {
+  if (
+    row.status !== "lost" ||
+    !["date_closed", "lost_verification_date"].includes(row.lostAtBasis ?? "")
+  )
+    return "";
+  const day = dateOnly(row.lostAt ?? "");
+  const timestamp = Date.parse(day);
+  return /^\d{4}-\d{2}-\d{2}$/.test(day) &&
+    Number.isFinite(timestamp) &&
+    new Date(timestamp).toISOString().slice(0, 10) === day &&
+    day >= dateOnly(row.createdAt) &&
+    day <= asOf
+    ? day
+    : "";
+}
+
+function aggregate(
+  name: string,
+  records: Enriched[],
+  callsAvailable: boolean,
+  asOf: string,
+): PerformanceGroup {
   const paidLeads = records.filter((row) => row.paidOrders.size > 0).length;
   const freshRows = records.filter((row) => row.leadSegment.trim().toLowerCase() === "fresh");
-  const lostSameEntryMonth = records.filter(
-    (row) =>
-      row.status === "lost" &&
-      ["date_closed", "lost_verification_date"].includes(row.lostAtBasis ?? "") &&
-      Boolean(row.lostAt) &&
-      monthOf(row.lostAt!) === monthOf(row.createdAt),
-  ).length;
+  const sameMonthLosses = records.filter(
+    (row) => monthOf(verifiedLostDay(row, asOf)) === monthOf(row.createdAt),
+  );
   const paidSameEntryMonth = records.filter(
     (row) => row.paidOrders.size > 0 && row.paidSameEntryMonth,
   ).length;
@@ -297,11 +317,13 @@ function aggregate(name: string, records: Enriched[], callsAvailable: boolean): 
     paidOrders: new Set(records.flatMap((row) => [...row.paidOrders])).size,
     paidLater: records.filter((row) => row.paidLater).length,
     paidRevenue: round2(records.reduce((sum, row) => sum + row.paidRevenue, 0)),
-    lostSameEntryMonth,
+    lostSameEntryMonth: sameMonthLosses.length,
+    lostLeadsSameEntryMonth: sameMonthLosses.filter((row) => row.recordType === "lead").length,
+    lostOpportunitiesSameEntryMonth: sameMonthLosses.filter(
+      (row) => row.recordType === "opportunity",
+    ).length,
     lostTimingUnverified: records.filter(
-      (row) =>
-        row.status === "lost" &&
-        !["date_closed", "lost_verification_date"].includes(row.lostAtBasis ?? ""),
+      (row) => row.status === "lost" && !verifiedLostDay(row, asOf),
     ).length,
     calendarLost: 0,
     calendarLostOlderEntry: 0,
@@ -382,7 +404,12 @@ export function performanceStages(group: PerformanceGroup, paidReady: boolean): 
   ];
 }
 
-function groups(records: Enriched[], key: (row: Enriched) => string, callsAvailable: boolean) {
+function groups(
+  records: Enriched[],
+  key: (row: Enriched) => string,
+  callsAvailable: boolean,
+  asOf: string,
+) {
   const map = new Map<string, Enriched[]>();
   for (const row of records) {
     const name = key(row).trim() || "—";
@@ -391,7 +418,7 @@ function groups(records: Enriched[], key: (row: Enriched) => string, callsAvaila
     map.set(name, list);
   }
   return [...map]
-    .map(([name, rows]) => aggregate(name, rows, callsAvailable))
+    .map(([name, rows]) => aggregate(name, rows, callsAvailable, asOf))
     .sort((a, b) => b.leads - a.leads || a.name.localeCompare(b.name));
 }
 
@@ -628,13 +655,10 @@ export function buildLeadPerformance(input: {
       month,
       scoped.filter((row) => monthOf(row.createdAt) === month),
       coverage.callsAvailable,
+      input.asOf,
     );
     const closedThisMonth = allScoped.filter(
-      (lead) =>
-        lead.status === "lost" &&
-        ["date_closed", "lost_verification_date"].includes(lead.lostAtBasis ?? "") &&
-        Boolean(lead.lostAt) &&
-        monthOf(lead.lostAt!) === month,
+      (lead) => monthOf(verifiedLostDay(lead, input.asOf)) === month,
     );
     const firstPaidThisMonth = allScoped.filter(
       (lead) =>
@@ -674,7 +698,9 @@ export function buildLeadPerformance(input: {
     value.count++;
     reasonMap.set(value.key, value);
   }
-  const selected = aggregate(selectedMonth, selectedRecords, coverage.callsAvailable);
+  const selected = aggregate(selectedMonth, selectedRecords, coverage.callsAvailable, input.asOf);
+  const breakdown = (records: Enriched[], key: (row: Enriched) => string) =>
+    groups(records, key, coverage.callsAvailable, input.asOf);
   return {
     asOf: input.asOf,
     months,
@@ -709,38 +735,29 @@ export function buildLeadPerformance(input: {
       };
     }),
     stages: performanceStages(selected, coverage.linksAvailable),
-    byCourse: groups(selectedRecords, (row) => row.course, coverage.callsAvailable),
-    bySource: groups(selectedRecords, (row) => row.source, coverage.callsAvailable),
-    byPlatform: groups(
-      selectedRecords,
-      (row) => {
-        const source = row.source.trim().toLocaleLowerCase("en");
-        const platform = Object.entries(PLATFORM_SOURCE_KEYS).find(([, keys]) =>
-          keys.includes(source),
-        );
-        return platform?.[0] ?? (source ? "organic / other" : "unknown");
-      },
-      coverage.callsAvailable,
-    ),
-    byCampaign: groups(selectedRecords, (row) => row.campaign, coverage.callsAvailable),
-    byMediaBuyer: groups(
-      selectedRecords,
-      (row) => {
-        if (!row.campaign.trim()) return "";
-        const buyer = mediaBuyerForCampaign(row.course, row.campaign);
-        return buyer && buyer !== "ambiguous"
-          ? MEDIA_BUYERS[buyer].name
-          : buyer === "ambiguous"
-            ? "Ambiguous"
-            : "";
-      },
-      coverage.callsAvailable,
-    ),
-    bySalesOwner: groups(selectedRecords, (row) => row.salesperson, coverage.callsAvailable),
-    bySalesCloser: groups(
+    byCourse: breakdown(selectedRecords, (row) => row.course),
+    bySource: breakdown(selectedRecords, (row) => row.source),
+    byPlatform: breakdown(selectedRecords, (row) => {
+      const source = row.source.trim().toLocaleLowerCase("en");
+      const platform = Object.entries(PLATFORM_SOURCE_KEYS).find(([, keys]) =>
+        keys.includes(source),
+      );
+      return platform?.[0] ?? (source ? "organic / other" : "unknown");
+    }),
+    byCampaign: breakdown(selectedRecords, (row) => row.campaign),
+    byMediaBuyer: breakdown(selectedRecords, (row) => {
+      if (!row.campaign.trim()) return "";
+      const buyer = mediaBuyerForCampaign(row.course, row.campaign);
+      return buyer && buyer !== "ambiguous"
+        ? MEDIA_BUYERS[buyer].name
+        : buyer === "ambiguous"
+          ? "Ambiguous"
+          : "";
+    }),
+    bySalesOwner: breakdown(selectedRecords, (row) => row.salesperson),
+    bySalesCloser: breakdown(
       selectedRecords.filter((row) => row.paidOrders.size > 0),
       (row) => row.closer,
-      coverage.callsAvailable,
     ).map((row) => ({ ...row, conversionRate: null, lostRate: null })),
     lossReasons: [...reasonMap.values()].sort((a, b) => b.count - a.count),
     unqualifiedReasons: (["customer_data", "course_fit", "unspecified"] as const).map(
@@ -749,10 +766,9 @@ export function buildLeadPerformance(input: {
         count: selectedRecords.filter((row) => row.unqualifiedCategory === category).length,
       }),
     ),
-    byClosingChannel: groups(
+    byClosingChannel: breakdown(
       selectedRecords.filter((row) => row.status === "won" || row.paidOrders.size > 0),
       (row) => row.closingChannel?.trim() || "—",
-      coverage.callsAvailable,
     ),
     coverage,
   };

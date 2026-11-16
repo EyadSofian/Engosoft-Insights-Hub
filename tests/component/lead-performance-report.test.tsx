@@ -58,6 +58,8 @@ const group = (name: string, patch: Record<string, unknown> = {}) => ({
   lostLeads: 10,
   lostOpportunities: 30,
   lostSameEntryMonth: 12,
+  lostLeadsSameEntryMonth: 3,
+  lostOpportunitiesSameEntryMonth: 9,
   lostTimingUnverified: 5,
   calendarLost: 18,
   calendarLostOlderEntry: 6,
@@ -501,10 +503,18 @@ describe("monthly Lost cohort tab", () => {
       }),
       "lost",
     );
-    await waitFor(() => expect(screen.getByText(/Records currently Lost/i)).toBeTruthy());
-    expect(screen.getByText(/not just losses closed during the month/i)).toBeTruthy();
+    await waitFor(() =>
+      expect(screen.getByText(/Entered and lost in the same month/i)).toBeTruthy(),
+    );
+    expect(screen.getByText(/Earlier arrivals and later losses are excluded/i)).toBeTruthy();
+    expect(screen.getByText("3.0%")).toBeTruthy();
+    expect(screen.getByText("9.0%")).toBeTruthy();
+    expect(screen.getByText("12.0%")).toBeTruthy();
+    expect(screen.getByText("Unverified loss date")).toBeTruthy();
     const platformTable = screen.getByRole("table");
     expect(within(platformTable).getByText("meta")).toBeTruthy();
+    expect(within(platformTable).getByText("24.0%")).toBeTruthy();
+    expect(within(platformTable).queryByText("40.0%")).toBeNull();
     fireEvent.click(screen.getByRole("tab", { name: "Media buyer" }));
     expect(within(screen.getByRole("table")).getByText("Sayed")).toBeTruthy();
     expect(

@@ -14,12 +14,16 @@ const wording = {
   ar: {
     title: "اللوست حسب شهر دخول الليد",
     subtitle: "افصل الليد المفقود عن الفرصة المفقودة، ثم راجع القناة والبياع والميديا باير.",
-    section: "توزيع السجلات التي أصبحت Lost",
-    hint: "المقام هو سجلات CRM التي دخلت في الشهر المختار؛ Lost هي حالتها الحالية في أودو. ليست عدد ما أُغلق Lost خلال الشهر فقط.",
-    all: "سجلات دخلت",
-    lostLeads: "Lost Leads",
-    lostOpportunities: "Lost Opportunities",
-    lostRate: "نسبة Lost من المجموعة",
+    section: "دخلت واتقفلت Lost في نفس الشهر",
+    hint: "العدد يشمل السجلات اللي دخلت في الشهر المختار وما زالت Lost في أودو، وتاريخ فقدها الموثّق في نفس الشهر. اللي دخل قبل الشهر أو اتقفل بعده مش محسوب.",
+    all: "إجمالي السجلات الداخلة",
+    lostLeads: "ليدز مفقودة",
+    lostOpportunities: "فرص بيعية مفقودة",
+    lostRate: "نسبة الفقد من السجلات الداخلة",
+    unverified: "تاريخ الفقد غير مؤكد",
+    notCounted: "ضمن السجلات الداخلة، لكن مش في عدد الفقد المؤكّد",
+    denominator: "المقام لكل النسب",
+    of: "من",
     platform: "القناة الإعلانية",
     source: "مصدر الليد",
     course: "الكورس",
@@ -27,7 +31,7 @@ const wording = {
     buyer: "الميديا باير",
     dimension: "التقسيم",
     incoming: "دخلت",
-    lostTotal: "Lost إجمالي",
+    lostTotal: "إجمالي الفقد في نفس الشهر",
     unknown: "غير منسوب",
     caveat:
       "القناة الإعلانية مستنتجة من مصدر الليد، والميديا باير يُنسب بقواعد الحملة والكورس؛ غير المنسوب يظل ظاهرًا ولا يُوزع بالتخمين. الفئات المستبعدة من الاستحواذ لا تدخل هذه الأرقام.",
@@ -38,12 +42,16 @@ const wording = {
     title: "Lost by lead entry month",
     subtitle:
       "Separate Lost Leads from Lost Opportunities, then inspect channel, salesperson and media buyer.",
-    section: "Records currently Lost",
-    hint: "The denominator is CRM records created in the selected month; Lost is their current Odoo state. This is not just losses closed during the month.",
-    all: "Records entered",
+    section: "Entered and lost in the same month",
+    hint: "Counts currently Lost Odoo records with both entry and a verified loss date in the selected month. Earlier arrivals and later losses are excluded.",
+    all: "Total records entered",
     lostLeads: "Lost Leads",
     lostOpportunities: "Lost Opportunities",
-    lostRate: "Lost rate of cohort",
+    lostRate: "Lost rate of entered records",
+    unverified: "Unverified loss date",
+    notCounted: "Included in entries, not in verified losses",
+    denominator: "Denominator for all rates",
+    of: "of",
     platform: "Ad channel",
     source: "Lead source",
     course: "Course",
@@ -51,7 +59,7 @@ const wording = {
     buyer: "Media buyer",
     dimension: "Breakdown",
     incoming: "Entered",
-    lostTotal: "Total Lost",
+    lostTotal: "Total lost in the same month",
     unknown: "Unattributed",
     caveat:
       "Ad channel is derived from lead source; media buyer uses campaign/course rules. Unattributed records remain visible and are not guessed into another group. Excluded acquisition sources are not counted.",
@@ -59,6 +67,9 @@ const wording = {
     empty: "No records in this breakdown for the selected month.",
   },
 } as const;
+
+const count = (n: number) => n.toLocaleString();
+const rate = (n: number, total: number) => (total ? `${((n / total) * 100).toFixed(1)}%` : "—");
 
 export function LostCohortReport({ initialMonth }: { initialMonth?: string }) {
   const { lang } = useI18n();
@@ -86,6 +97,12 @@ export function LostCohortReport({ initialMonth }: { initialMonth?: string }) {
     { key: "buyer", label: t.buyer, rows: data.byMediaBuyer },
   ];
   const rows = dimensions.find((item) => item.key === dimension)?.rows ?? [];
+  const selected = data.selected;
+  const share = (n: number, total: number) => (
+    <>
+      <bdi>{rate(n, total)}</bdi> · <bdi>{count(n)}</bdi> {t.of} <bdi>{count(total)}</bdi>
+    </>
+  );
   const cols: Col<PerformanceGroup>[] = [
     {
       key: "name",
@@ -106,29 +123,43 @@ export function LostCohortReport({ initialMonth }: { initialMonth?: string }) {
       key: "lostLeads",
       header: t.lostLeads,
       align: "right",
-      render: (row) => row.lostLeads.toLocaleString(),
-      sortValue: (row) => row.lostLeads,
+      render: (row) => (
+        <>
+          <bdi>{count(row.lostLeadsSameEntryMonth)}</bdi>{" "}
+          <span className="text-xs text-text-muted">
+            · <bdi>{rate(row.lostLeadsSameEntryMonth, row.leads)}</bdi>
+          </span>
+        </>
+      ),
+      sortValue: (row) => row.lostLeadsSameEntryMonth,
     },
     {
       key: "lostOpportunities",
       header: t.lostOpportunities,
       align: "right",
-      render: (row) => row.lostOpportunities.toLocaleString(),
-      sortValue: (row) => row.lostOpportunities,
+      render: (row) => (
+        <>
+          <bdi>{count(row.lostOpportunitiesSameEntryMonth)}</bdi>{" "}
+          <span className="text-xs text-text-muted">
+            · <bdi>{rate(row.lostOpportunitiesSameEntryMonth, row.leads)}</bdi>
+          </span>
+        </>
+      ),
+      sortValue: (row) => row.lostOpportunitiesSameEntryMonth,
     },
     {
       key: "lost",
       header: t.lostTotal,
       align: "right",
-      render: (row) => row.lost.toLocaleString(),
-      sortValue: (row) => row.lost,
+      render: (row) => count(row.lostSameEntryMonth),
+      sortValue: (row) => row.lostSameEntryMonth,
     },
     {
       key: "lostRate",
       header: t.lostRate,
       align: "right",
-      render: (row) => (row.lostRate === null ? "—" : `${row.lostRate.toFixed(1)}%`),
-      sortValue: (row) => row.lostRate ?? -1,
+      render: (row) => <span className="text-xs">{share(row.lostSameEntryMonth, row.leads)}</span>,
+      sortValue: (row) => (row.leads ? row.lostSameEntryMonth / row.leads : -1),
     },
   ];
 
@@ -153,27 +184,42 @@ export function LostCohortReport({ initialMonth }: { initialMonth?: string }) {
           />
         }
       >
-        <div className="mb-4 grid gap-3 sm:grid-cols-4">
+        <p className="mb-3 text-xs text-text-muted">
+          <bdi className="font-bold">{data.selectedMonth}</bdi> ·{" "}
+          {lang === "ar" ? "البيانات حتى" : "Data through"} <bdi>{data.asOf}</bdi>
+        </p>
+        <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           {[
-            { label: t.all, value: data.selected.leads, tone: "border-brand" },
-            { label: t.lostLeads, value: data.selected.lostLeads, tone: "border-amber-strong" },
+            { label: t.all, value: selected.leads, tone: "border-brand", note: t.denominator },
             {
-              label: t.lostOpportunities,
-              value: data.selected.lostOpportunities,
-              tone: "border-rose-strong",
+              label: t.lostLeads,
+              value: selected.lostLeadsSameEntryMonth,
+              tone: "border-amber-strong",
+              note: share(selected.lostLeadsSameEntryMonth, selected.leads),
             },
             {
-              label: t.lostRate,
-              value:
-                data.selected.lostRate === null ? "—" : `${data.selected.lostRate.toFixed(1)}%`,
+              label: t.lostOpportunities,
+              value: selected.lostOpportunitiesSameEntryMonth,
               tone: "border-rose-strong",
+              note: share(selected.lostOpportunitiesSameEntryMonth, selected.leads),
+            },
+            {
+              label: t.lostTotal,
+              value: selected.lostSameEntryMonth,
+              tone: "border-rose-strong bg-rose-soft/40",
+              note: share(selected.lostSameEntryMonth, selected.leads),
+            },
+            {
+              label: t.unverified,
+              value: selected.lostTimingUnverified,
+              tone: "border-border",
+              note: t.notCounted,
             },
           ].map((item) => (
             <Card key={item.label} className={`border-t-[3px] ${item.tone}`}>
               <div className="text-xs text-text-muted">{item.label}</div>
-              <div className="num mt-2 text-3xl font-bold text-text">
-                {typeof item.value === "number" ? item.value.toLocaleString() : item.value}
-              </div>
+              <div className="num mt-2 text-3xl font-bold text-text">{count(item.value)}</div>
+              <p className="mt-2 text-xs leading-5 text-text-muted">{item.note}</p>
             </Card>
           ))}
         </div>
@@ -195,10 +241,13 @@ export function LostCohortReport({ initialMonth }: { initialMonth?: string }) {
             csvRow={(row) => ({
               name: row.name,
               entered: row.leads,
-              lostLeads: row.lostLeads,
-              lostOpportunities: row.lostOpportunities,
-              totalLost: row.lost,
-              lostRate: row.lostRate ?? "",
+              lostLeadsSameEntryMonth: row.lostLeadsSameEntryMonth,
+              lostLeadsPctOfEntered: rate(row.lostLeadsSameEntryMonth, row.leads),
+              lostOpportunitiesSameEntryMonth: row.lostOpportunitiesSameEntryMonth,
+              lostOpportunitiesPctOfEntered: rate(row.lostOpportunitiesSameEntryMonth, row.leads),
+              totalLostSameEntryMonth: row.lostSameEntryMonth,
+              totalLostPctOfEntered: rate(row.lostSameEntryMonth, row.leads),
+              lostTimingUnverified: row.lostTimingUnverified,
             })}
             emptyState={<p className="p-8 text-center text-sm text-text-muted">{t.empty}</p>}
           />

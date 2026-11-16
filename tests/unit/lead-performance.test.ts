@@ -138,6 +138,53 @@ describe("six-month lead performance", () => {
     expect(result.rows[1]?.calendarPaidOlderEntry).toBe(1);
   });
 
+  it("splits only same-month losses with a valid Odoo date across every breakdown", () => {
+    const example = (
+      id: string,
+      createdAt: string,
+      lostAt: string,
+      patch: Partial<PerformanceLead> = {},
+    ) =>
+      lead(id, createdAt, {
+        source: "Facebook",
+        status: "lost",
+        lostAt,
+        lostAtBasis: "date_closed",
+        ...patch,
+      });
+    const result = buildLeadPerformance({
+      ...base(),
+      selectedMonth: "2026-10",
+      asOf: "2026-10-16",
+      leads: [
+        example("lead", "2026-10-02", "2026-10-16"),
+        example("opp", "2026-10-02", "2026-10-16", {
+          recordType: "opportunity",
+          lostAtBasis: "lost_verification_date",
+        }),
+        example("older", "2026-09-30", "2026-10-02"),
+        example("future", "2026-10-02", "2026-10-30"),
+        example("before-entry", "2026-10-05", "2026-10-02"),
+        example("no-date", "2026-10-05", ""),
+        example("fallback", "2026-10-05", "2026-10-08", { lostAtBasis: "write_date_fallback" }),
+      ],
+      invoices: [],
+      links: [],
+      calls: null,
+    });
+    for (const group of [result.selected, result.byPlatform[0], result.bySource[0]]) {
+      expect(group).toMatchObject({
+        leads: 6,
+        lost: 6,
+        lostSameEntryMonth: 2,
+        lostLeadsSameEntryMonth: 1,
+        lostOpportunitiesSameEntryMonth: 1,
+        lostTimingUnverified: 4,
+      });
+    }
+    expect(result.rows.at(-1)).toMatchObject({ calendarLost: 3, calendarLostOlderEntry: 1 });
+  });
+
   it("keeps the entry cohort distinct from the current Fresh tag and emits auditable records", () => {
     const result = buildLeadPerformance({
       ...base(),
