@@ -4,8 +4,14 @@ export const Route = createFileRoute("/api/courses")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const { computeCourses, computeTotals, getFiltered, isPreviousComparable, previousPeriod } =
-          await import("@/lib/metrics.server");
+        const {
+          authoritativeLostLeads,
+          computeCourses,
+          computeTotals,
+          getFiltered,
+          isPreviousComparable,
+          previousPeriod,
+        } = await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
         const { buildCourseDrill } = await import("@/lib/course-intelligence.server");
         const { buildCourseLeadLossReport } = await import("@/lib/course-lead-loss");
@@ -30,18 +36,51 @@ export const Route = createFileRoute("/api/courses")({
           currentRange: { from: filters.from ?? "", to: filters.to ?? "" },
           previousRange: prevRange,
         });
-        const detail = new URL(request.url).searchParams.get("detail")?.trim() ?? "";
+        const params = new URL(request.url).searchParams;
+        const detail = params.get("detail")?.trim() ?? "";
 
         // The drill-down lives in src/lib/course-intelligence.server.ts so the
         // agent contract and this page compute it with the same code. See the
         // module header for why.
         const drill = detail ? buildCourseDrill(data, detail, filters, organicScope) : null;
+        const sellerRanking =
+          detail && params.get("sellerRanking") === "1"
+            ? await (async () => {
+                const { buildCourseSellerRanking } = await import("@/lib/course-seller-ranking");
+                const fresh = (key: string) => {
+                  const age =
+                    Date.now() -
+                    Date.parse(
+                      data.snapshot.tabSyncs.find((item) => item.key === key)?.syncedAt ?? "",
+                    );
+                  return age >= 0 && age < 48 * 60 * 60 * 1000;
+                };
+                return buildCourseSellerRanking({
+                  course: detail,
+                  crm: data.crm,
+                  lost: authoritativeLostLeads(data),
+                  orders: data.invoiced,
+                  collections: data.accounting,
+                  availability: {
+                    // The company dimension only exists on the collections feed here.
+                    crm:
+                      !filters.company &&
+                      fresh("crm") &&
+                      fresh("lost") &&
+                      data.snapshot.health.lostAuthority !== "unavailable",
+                    orders: !filters.company && fresh("invoiced"),
+                    collections: fresh("accounting"),
+                  },
+                });
+              })()
+            : null;
 
         return json({
           courses,
           courseLeadLoss,
           totals: computeTotals(data),
           drill,
+          sellerRanking,
           prevRange,
           prevComparable,
           health: data.snapshot.health,

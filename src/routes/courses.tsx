@@ -25,6 +25,7 @@ import {
 import { FilterSummary } from "@/components/ads/FilterSummary";
 import { CourseCreativeGallery } from "@/components/ads/CampaignCreativeGallery";
 import { CourseLeadLossComparison } from "@/components/CourseLeadLossComparison";
+import { CourseSellerLeaderboard } from "@/components/CourseSellerLeaderboard";
 import { DeltaBadge, EmptyState, ErrorState, Notice, Pill, Skeleton } from "@/components/ui-bits";
 import { OverviewCourseContribution } from "@/components/overview-records";
 import { DashboardPageHeader, DataHealthSummary } from "@/components/dashboard-bits";
@@ -35,6 +36,7 @@ import { PLATFORM_COLOR, PLATFORM_LABEL } from "@/lib/constants";
 import type { CourseLeadAlertReport, CourseLeadSignal } from "@/lib/course-lead-alerts";
 import type { CourseLeadLossReport } from "@/lib/course-lead-loss";
 import { courseCrmCpl } from "@/lib/course-cpl";
+import type { CourseSellerRanking } from "@/lib/course-seller-ranking";
 import { useFilters } from "@/lib/filter-store";
 import { fmtDate, fmtNum, fmtPct, fmtRoas, fmtUSD, fmtUSDFull, useI18n } from "@/lib/i18n";
 import type { CampaignObjective, CourseAgg, Platform, Totals } from "@/lib/types";
@@ -114,6 +116,7 @@ interface CoursesResponse {
   courseLeadLoss: CourseLeadLossReport;
   totals: Totals;
   drill?: CourseDrill | null;
+  sellerRanking?: CourseSellerRanking | null;
 }
 
 /**
@@ -367,9 +370,11 @@ function Courses() {
     selectedCourse ? { type: "course", id: selectedCourse.key, name: selectedCourse.name } : null,
   );
   const detailPath = selectedCourse
-    ? `/api/courses?detail=${encodeURIComponent(selectedCourse.name)}`
+    ? `/api/courses?detail=${encodeURIComponent(selectedCourse.name)}${adsView ? "" : "&sellerRanking=1"}`
     : "/api/courses";
-  const detailQuery = useApi<CoursesResponse>(detailPath);
+  const detailQuery = useApi<CoursesResponse>(detailPath, {
+    enabled: !!selectedCourse && section === "courses",
+  });
   const visibleCourses = useMemo(() => {
     const query = search.trim().toLocaleLowerCase(lang === "ar" ? "ar" : "en");
     if (!query) return courses;
@@ -566,6 +571,7 @@ function Courses() {
                 <CourseDetailPanel
                   course={selectedCourse}
                   drill={detailQuery.data?.drill ?? null}
+                  sellerRanking={detailQuery.data?.sellerRanking ?? null}
                   loading={detailQuery.isLoading}
                   error={detailQuery.error as Error | null}
                   organicScope={organicScope}
@@ -779,7 +785,8 @@ function CourseSnapshotCards({
                 </span>
               </div>
               <p className="mt-1 text-[11px] text-text-subtle">
-                {lang === "ar" ? "الصرف ÷" : "Spend ÷"} {fmtNum(course.crmLeads)} {lang === "ar" ? "ليد CRM" : "CRM leads"}
+                {lang === "ar" ? "الصرف ÷" : "Spend ÷"} {fmtNum(course.crmLeads)}{" "}
+                {lang === "ar" ? "ليد CRM" : "CRM leads"}
               </p>
             </div>
           </article>
@@ -852,6 +859,9 @@ function CoursePortfolioNavigator({
 
   const selectCourse = (key: string) => {
     onSelect(key);
+    if (mode === "sales") {
+      requestAnimationFrame(() => document.getElementById("course-detail")?.scrollIntoView());
+    }
   };
 
   return (
@@ -1006,19 +1016,26 @@ function CoursePortfolioNavigator({
                   />
                   <CourseCardMetric
                     label={lang === "ar" ? "أوامر البيع" : "Sales orders"}
-                    value={fmtNum(course.orders)}
+                    value={fmtNum(mode === "sales" ? course.salesOrders : course.orders)}
                   />
                   <CourseCardMetric
                     label={lang === "ar" ? "التحصيل ÷ الصرف" : "Collections ÷ spend"}
                     value={fmtRoas(course.roas)}
                   />
+                  {mode === "sales" && (
+                    <CourseCardMetric
+                      label={lang === "ar" ? "نسبة الإغلاق" : "Win rate"}
+                      value={fmtPct(course.conversionRate, 1)}
+                    />
+                  )}
                 </div>
 
                 <div className="mx-4 mt-4 flex items-center justify-between gap-3 rounded-xl border border-brand/20 bg-brand-soft px-3 py-2.5">
                   <span className="min-w-0 text-[12px] font-bold text-brand">
                     {lang === "ar" ? "تكلفة ليد CRM" : "CRM cost per lead"}
                     <span className="mt-0.5 block text-[11px] font-medium text-text-muted">
-                      {fmtUSD(course.spend)} ÷ {fmtNum(course.crmLeads)} {lang === "ar" ? "ليد" : "leads"}
+                      {fmtUSD(course.spend)} ÷ {fmtNum(course.crmLeads)}{" "}
+                      {lang === "ar" ? "ليد" : "leads"}
                     </span>
                   </span>
                   <span className="num text-base font-bold text-text">
@@ -1509,6 +1526,7 @@ function CourseSignalStatus({ row, paused = false }: { row: CourseLeadSignal; pa
 function CourseDetailPanel({
   course,
   drill,
+  sellerRanking,
   loading,
   error,
   organicScope,
@@ -1516,6 +1534,7 @@ function CourseDetailPanel({
 }: {
   course: CourseAgg;
   drill: CourseDrill | null;
+  sellerRanking: CourseSellerRanking | null;
   loading: boolean;
   error: Error | null;
   organicScope: boolean;
@@ -1552,7 +1571,7 @@ function CourseDetailPanel({
 
   if (loading || !drill || drill.course !== course.name) {
     return (
-      <section id="course-detail" className="space-y-3">
+      <section id="course-detail" className="space-y-3 scroll-mt-28">
         <Skeleton className="h-[120px]" />
         <div className="card-grid lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, index) => (
@@ -1717,6 +1736,10 @@ function CourseDetailPanel({
           </div>
         )}
       </div>
+
+      {mode === "sales" && detailTab === "summary" && sellerRanking && (
+        <CourseSellerLeaderboard key={course.key} course={course.name} report={sellerRanking} />
+      )}
 
       {!organicScope && mode === "ads" && detailTab === "creatives" && (
         <CourseCreativeGallery courseName={course.name} />
