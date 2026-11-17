@@ -20,36 +20,39 @@ const input = {
   collections: [
     { course: "BIM", salesperson: "Mr. Amr", usdPaid: 300 },
     { course: "BIM", salesperson: "mr amr", usdPaid: -50 },
+    { course: "BIM", salesperson: "Sara", usdPaid: 150 },
+    { course: "BIM", salesperson: "", usdPaid: 100 },
+    { course: "PMP", salesperson: "Sara", usdPaid: 200 },
   ],
   availability: { crm: true, orders: true, collections: true },
 };
 
 describe("course seller leaderboard", () => {
-  it("ranks by course order-line value, dedupes orders and leads, and keeps collections separate", () => {
+  it("ranks by signed course collections, dedupes orders and leads, and includes unassigned money in the total", () => {
     const report = buildCourseSellerRanking(input);
-    expect(report.rankBy).toBe("sales");
+    expect(report.totalCollected).toBe(500);
     expect(report.rows).toEqual([
-      {
-        key: "sara",
-        name: "Sara",
-        rank: 1,
-        leads: 0,
-        won: 0,
-        winRate: null,
-        orders: 1,
-        sales: 600,
-        collected: 0,
-      },
       {
         key: "mr amr",
         name: "Mr. Amr",
-        rank: 2,
+        rank: 1,
         leads: 3,
         won: 1,
         winRate: 100 / 3,
         orders: 1,
-        sales: 500,
         collected: 250,
+        collectionShare: 50,
+      },
+      {
+        key: "sara",
+        name: "Sara",
+        rank: 2,
+        leads: 0,
+        won: 0,
+        winRate: null,
+        orders: 1,
+        collected: 150,
+        collectionShare: 30,
       },
       {
         key: "",
@@ -59,26 +62,38 @@ describe("course seller leaderboard", () => {
         won: 0,
         winRate: null,
         orders: 1,
-        sales: 1000,
-        collected: 0,
+        collected: 100,
+        collectionShare: 20,
       },
     ]);
   });
 
-  it("does not show zero for missing feeds, and ranks on collections only when available", () => {
+  it("does not fall back to sale orders when collections are unavailable", () => {
     const report = buildCourseSellerRanking({
       ...input,
-      availability: { crm: false, orders: false, collections: true },
+      availability: { crm: false, orders: true, collections: false },
     });
-    expect(report.rankBy).toBe("collected");
-    expect(report.rows).toHaveLength(1);
+    expect(report.totalCollected).toBeNull();
     expect(report.rows[0]).toMatchObject({
-      rank: 1,
+      rank: null,
       leads: null,
       winRate: null,
-      sales: null,
-      orders: null,
-      collected: 250,
+      orders: 1,
+      collected: null,
+      collectionShare: null,
     });
+  });
+
+  it("uses the complete course denominator even when only one seller is displayed", () => {
+    const report = buildCourseSellerRanking({
+      ...input,
+      orders: [],
+      crm: [],
+      lost: [],
+      collections: [{ course: "BIM", salesperson: "Sara", usdPaid: 150 }],
+      courseCollections: input.collections,
+    });
+    expect(report.totalCollected).toBe(500);
+    expect(report.rows[0]?.collectionShare).toBe(30);
   });
 });

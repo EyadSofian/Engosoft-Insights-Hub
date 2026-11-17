@@ -55,12 +55,25 @@ export const Route = createFileRoute("/api/courses")({
                     );
                   return age >= 0 && age < 48 * 60 * 60 * 1000;
                 };
+                const courseCollections =
+                  fresh("accounting") && (filters.salesperson || filters.salesTeam)
+                    ? (
+                        await getFiltered({
+                          ...filters,
+                          course: detail,
+                          salesperson: undefined,
+                          salesTeam: undefined,
+                        })
+                      ).accounting
+                    : undefined;
                 return buildCourseSellerRanking({
                   course: detail,
                   crm: data.crm,
                   lost: authoritativeLostLeads(data),
                   orders: data.invoiced,
                   collections: data.accounting,
+                  courseCollections,
+                  period: { from: filters.from, to: filters.to },
                   availability: {
                     // The company dimension only exists on the collections feed here.
                     crm:

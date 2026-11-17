@@ -11,8 +11,11 @@ export function buildCourseSellerRanking(input: {
   course: string;
   crm: readonly Pick<CrmLeadRow, "id" | "course" | "salesperson" | "isWon">[];
   lost: readonly Pick<LostRow, "id" | "course" | "salesperson">[];
-  orders: readonly Pick<InvoicedRow, "course" | "salesperson" | "orderRef" | "usdSales">[];
+  orders: readonly Pick<InvoicedRow, "course" | "salesperson" | "orderRef">[];
   collections: readonly Pick<AccountingRow, "course" | "salesperson" | "usdPaid">[];
+  /** Same course and reporting filters, without seller/team filters. */
+  courseCollections?: readonly Pick<AccountingRow, "course" | "usdPaid">[];
+  period?: { from?: string; to?: string };
   availability: CourseSellerAvailability;
 }) {
   const courseKey = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
@@ -25,7 +28,6 @@ export function buildCourseSellerRanking(input: {
       leads: number;
       won: number;
       orderRefs: Set<string>;
-      sales: number;
       collected: number;
     }
   >();
@@ -38,7 +40,6 @@ export function buildCourseSellerRanking(input: {
       leads: 0,
       won: 0,
       orderRefs: new Set<string>(),
-      sales: 0,
       collected: 0,
     };
     people.set(key, person);
@@ -64,7 +65,6 @@ export function buildCourseSellerRanking(input: {
       if (!isCourse(row.course)) continue;
       const p = seller(row.salesperson);
       if (row.orderRef) p.orderRefs.add(row.orderRef);
-      p.sales += row.usdSales;
     }
   }
   if (availability.collections) {
@@ -72,30 +72,37 @@ export function buildCourseSellerRanking(input: {
       if (isCourse(row.course)) seller(row.salesperson).collected += row.usdPaid;
     }
   }
-  // Use the course's signed order-line values, not whole orders that can contain other courses.
-  const rankBy = availability.orders ? "sales" : availability.collections ? "collected" : null;
+  const totalCollected = availability.collections
+    ? (input.courseCollections ?? input.collections)
+        .filter((row) => isCourse(row.course))
+        .reduce((sum, row) => sum + row.usdPaid, 0)
+    : null;
   let rank = 0;
   return {
     availability,
-    rankBy,
+    period: input.period,
+    totalCollected,
     rows: [...people]
       .sort(
         ([aKey, a], [bKey, b]) =>
           Number(!aKey) - Number(!bKey) ||
-          (rankBy ? b[rankBy] - a[rankBy] : 0) ||
+          b.collected - a.collected ||
           b.leads - a.leads ||
           a.name.localeCompare(b.name),
       )
       .map(([key, p]) => ({
         key,
         name: p.name,
-        rank: key && rankBy && p[rankBy] > 0 ? ++rank : null,
+        rank: key && availability.collections && p.collected > 0 ? ++rank : null,
         leads: availability.crm ? p.leads : null,
         won: availability.crm ? p.won : null,
         winRate: availability.crm && p.leads ? (100 * p.won) / p.leads : null,
         orders: availability.orders ? p.orderRefs.size : null,
-        sales: availability.orders ? p.sales : null,
         collected: availability.collections ? p.collected : null,
+        collectionShare:
+          totalCollected !== null && totalCollected > 0
+            ? (100 * p.collected) / totalCollected
+            : null,
       })),
   };
 }

@@ -10,7 +10,7 @@ afterEach(() => {
   localStorage.clear();
 });
 
-it("shows order value alongside collected amount, cohort and conversion; expands the full list", () => {
+it("shows collected amount and share, explains win rate and expands the full list", () => {
   const sellers = Array.from({ length: 6 }, (_, i) => `Seller ${i + 1}`);
   const report = buildCourseSellerRanking({
     course: "BIM",
@@ -20,7 +20,6 @@ it("shows order value alongside collected amount, cohort and conversion; expands
       course: "BIM",
       salesperson,
       orderRef: `S${i}`,
-      usdSales: 600 - i * 100,
     })),
     collections: [{ course: "BIM", salesperson: sellers[0], usdPaid: 450 }],
     availability: { crm: true, orders: true, collections: true },
@@ -36,7 +35,9 @@ it("shows order value alongside collected amount, cohort and conversion; expands
     within(first)
       .getAllByRole("cell")
       .map((cell) => cell.textContent),
-  ).toEqual(["#1", "$600", "1", "$450", "2", "1", "50.0%"]);
+  ).toEqual(["#1", "$450", "100.0%", "1", "2", "1", "50.0%"]);
+  expect(screen.queryByRole("columnheader", { name: "Sales order value" })).toBeNull();
+  expect(screen.getByRole("button", { name: "Export course Excel" })).toBeTruthy();
   expect(within(table).queryByRole("rowheader", { name: "Seller 6" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Show all salespeople (6)" }));
   expect(within(table).getByRole("rowheader", { name: "Seller 6" })).toBeTruthy();
