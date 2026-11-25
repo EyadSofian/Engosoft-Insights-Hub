@@ -16,7 +16,18 @@ import { SLICE_INPUT_PROPERTIES, sliceJson } from "./mcp-json-slice";
 import { issuePnlCookie, pnlGuardApplies } from "./profitability-access.server";
 import { issueRevenueSessionCookie, revenueGuardApplies } from "./revenue-access.server";
 
-const originOf = (request: Request) => new URL(request.url).origin;
+/**
+ * Where internal reads go. Over loopback when the port is known, so the
+ * service secret and admin code never cross the network: `request.url` reports
+ * `http://<public host>` behind Railway's proxy, and a read sent there leaves
+ * the container in plain HTTP and comes back as a 301 to https.
+ */
+const originOf = (request: Request) => {
+  const port = process.env.PORT?.trim();
+  if (port && /^\d+$/u.test(port)) return `http://127.0.0.1:${port}`;
+  const url = new URL(request.url);
+  return `https://${url.host}`;
+};
 
 /** First `name=value` pair of a Set-Cookie string, for a Cookie header. */
 const cookiePair = (setCookie: string | null) => (setCookie ? setCookie.split(";")[0] : "");
