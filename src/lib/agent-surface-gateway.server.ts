@@ -327,7 +327,11 @@ async function fetchSource(
   filters: Record<string, string>,
   origin: string,
   doFetch: typeof fetch,
-): Promise<{ source: SurfaceSource; payload: Record<string, unknown> | null; evidence: SourceEvidence }> {
+): Promise<{
+  source: SurfaceSource;
+  payload: Record<string, unknown> | null;
+  evidence: SourceEvidence;
+}> {
   const missing = (source.requiredArgs ?? []).filter((key) => !filters[key]);
   if (missing.length > 0) {
     // Optional-and-unarmed: skipped, and said so. Not an error, not a silent
@@ -426,7 +430,11 @@ function collectSummary(
   take(payload.totals);
   take(payload.summary);
   for (const path of paths) {
-    take(readPath(payload, path), path.split(".").at(-1) ?? path);
+    const value = readPath(payload, path);
+    const key = path.split(".").at(-1) ?? path;
+    // Explicit scalar paths (selected.month, targetBasis) are evidence too.
+    if (typeof value === "number" || typeof value === "string") take({ [key]: value }, path);
+    else take(value, key);
   }
   for (const [key, value] of Object.entries(payload)) {
     if (typeof value === "number" && Number.isFinite(value) && !(key in out)) out[key] = value;
@@ -445,7 +453,8 @@ function collectFreshness(
     if (typeof value === "string" && value.length > 0 && value.length < 80) out[name] = value;
     else if (typeof value === "number" && Number.isFinite(value)) out[name] = value;
   };
-  const FRESH_KEYS = /^(asOf|syncedAt|fetchedAt|generatedAt|checkedAt|from|to|today|source|authority)$/i;
+  const FRESH_KEYS =
+    /^(asOf|syncedAt|fetchedAt|generatedAt|checkedAt|from|to|today|source|authority)$/i;
   for (const path of paths) {
     const node = readPath(payload, path);
     if (typeof node === "string" || typeof node === "number") {
@@ -462,7 +471,8 @@ function collectFreshness(
 function readPath(root: unknown, path: string): unknown {
   let node: unknown = root;
   for (const segment of path.split(".")) {
-    node = node && typeof node === "object" ? (node as Record<string, unknown>)[segment] : undefined;
+    node =
+      node && typeof node === "object" ? (node as Record<string, unknown>)[segment] : undefined;
   }
   return node;
 }
@@ -584,11 +594,16 @@ function projectRows(
     ).trim();
     if (!label) return [];
 
+    const displayLabel =
+      projection.kind === "current_crm_owner" && label === "—"
+        ? "No current CRM owner (not assignment/contact history)"
+        : label;
+
     return [
       {
         kind: projection.kind,
-        label,
-        line: renderLine(label, metrics, courses, people, contract),
+        label: displayLabel,
+        line: renderLine(displayLabel, metrics, courses, people, contract),
         metrics,
       },
     ];
@@ -632,7 +647,11 @@ function renderLine(
   else if (has("crmLeads")) parts.push(`${metrics.crmLeads} ليد`);
   else if (has("leads")) parts.push(`${metrics.leads} ليد`);
   if (has("won")) parts.push(`${metrics.won} صفقة`);
-  if (has("roas")) parts.push(`ROAS ${typeof metrics.roas === "number" ? metrics.roas.toFixed(2) : "—"}x`);
+  if (has("crmWon")) parts.push(`${metrics.crmWon} Won في CRM، مش إثبات دفع`);
+  if (has("lost")) parts.push(`${metrics.lost} Lost`);
+  if (has("confirmedDuplicate")) parts.push(`${metrics.confirmedDuplicate} Lost بسبب مكرر مسجّل`);
+  if (has("roas"))
+    parts.push(`ROAS ${typeof metrics.roas === "number" ? metrics.roas.toFixed(2) : "—"}x`);
   if (has("cpl")) parts.push(`CPL ${money(metrics.cpl)}`);
   if (has("conversionRate")) parts.push(`تحويل ${pct(metrics.conversionRate)}`);
   if (has("targetLeads")) parts.push(`تارجت ليدز ${metrics.targetLeads}`);

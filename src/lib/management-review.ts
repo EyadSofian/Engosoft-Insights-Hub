@@ -58,6 +58,16 @@ export function addFunnel(target: FunnelFacts, value: FunnelFacts): void {
     target.lostReasons[reason] = (target.lostReasons[reason] ?? 0) + count;
 }
 
+export function mergeFunnelCourses(rows: readonly FunnelCourse[]): FunnelCourse[] {
+  const map = new Map<string, FunnelCourse>();
+  for (const row of rows) {
+    const current = map.get(row.course) ?? { course: row.course, ...emptyFunnel() };
+    addFunnel(current, row);
+    map.set(row.course, current);
+  }
+  return [...map.values()];
+}
+
 function taggedSegment(segment: string): "fresh" | "old" | "" {
   const value = segment.trim().toLowerCase();
   return value === "fresh" ? "fresh" : value === "old data" ? "old" : "";

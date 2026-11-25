@@ -22,6 +22,7 @@ export const Route = createFileRoute("/api/overview")({
           execSummary,
           computeRecentCampaignActivity,
           computeRevenueLeadAttribution,
+          authoritativeLostLeads,
         } = await import("@/lib/metrics.server");
         const { parseFilters, json } = await import("@/lib/api.server");
         const { getAdSpendCoverage } = await import("@/lib/ad-delivery-coverage.server");
@@ -31,6 +32,21 @@ export const Route = createFileRoute("/api/overview")({
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
+        const { buildLeadOwnershipAudit } = await import("@/lib/lead-ownership-audit");
+        const ownershipAudit = buildLeadOwnershipAudit([
+          ...data.crm.map((row) => ({
+            id: row.id,
+            salesperson: row.salesperson,
+            status: row.isWon ? "won" : row.businessStatus,
+            lossReason: row.lossReason,
+          })),
+          ...authoritativeLostLeads(data).map((row) => ({
+            id: row.id,
+            salesperson: row.salesperson,
+            status: "lost",
+            lossReason: row.lossReason,
+          })),
+        ]);
         const mediaPlan = await loadMediaPlanSource();
         const leadTargets = overviewLeadTargets(data, filters, mediaPlan.plans, mediaPlan.error);
         const spendCoverage = await getAdSpendCoverage({
@@ -141,6 +157,7 @@ export const Route = createFileRoute("/api/overview")({
         const health = data.snapshot.health;
 
         return json({
+          ownershipAudit,
           totals,
           deltas,
           prevRange,

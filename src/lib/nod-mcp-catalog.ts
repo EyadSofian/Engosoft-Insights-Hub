@@ -80,14 +80,14 @@ export const NOD_ENDPOINTS: readonly NodEndpoint[] = [
   { path: "/api/meta/lead-ads/operations", page: "Lead ads", what: "Meta lead ads worker health." },
 
   // CRM and leads
-  { path: "/api/leads", page: "Leads", what: "Leads and CRM: counts by stage, source, course and owner.", filters: true },
+  { path: "/api/leads", page: "Leads", what: "CRM counts plus ownershipAudit: current owner missing, recorded-duplicate Lost, other Lost and active unowned. Current owner is not assignment/contact history.", filters: true },
   { path: "/api/lead-intelligence", page: "Leads", what: "Lead intelligence per course and owner.", params: ["focusCourse", "focusOwner", "page"], filters: true },
-  { path: "/api/lead-performance", page: "Leads", what: "Lead performance by course for a month.", params: ["course", "month"] },
+  { path: "/api/lead-performance", page: "Leads", what: "Entry-month cohort performance, identity-duplicate candidates, recorded duplicate reasons and ownershipAudit. Read ownershipAudit before interpreting a blank salesperson.", params: ["course", "month"] },
   { path: "/api/weekly-lead-followup", page: "Leads", what: "Weekly lead follow-up.", params: ["week", "page"] },
   { path: "/api/lead-course-distribution", page: "Lead distribution", what: "Leads by course, stage and bucket, with the leads behind each cell.", params: ["dimension", "label", "bucket", "stage", "opportunityLost", "page"], filters: true },
   { path: "/api/lead-source-matrix", page: "Lead sources", what: "Lead source by course matrix, with the leads behind each cell.", params: ["matrixCourse", "matrixSource", "page"], filters: true },
   { path: "/api/lead-qa", page: "Leads", what: "Lead QA verdicts (ids=1,2,3) or one lead's history (history=id).", params: ["ids", "history"] },
-  { path: "/api/uncalled-leads", page: "Leads", what: "Leads nobody has called yet.", params: ["employee", "scope", "status", "sort", "page", "pageSize"], filters: true },
+  { path: "/api/uncalled-leads", page: "Leads", what: "Explicit contact-evidence report with coverage: unknown is not uncontacted; a blank owner or Lost reason does not prove nobody called.", params: ["employee", "scope", "status", "sort", "page", "pageSize"], filters: true },
   { path: "/api/quarter-leads-review", page: "Quarter leads review", what: "Quarterly native-lead and course-cohort review.", filters: true },
   { path: "/api/course-lead-alerts", page: "Courses", what: "Course lead alerts.", filters: true },
   { path: "/api/lost", page: "Lost", what: "Lost leads by reason, team, course and salesperson.", filters: true },
@@ -114,7 +114,7 @@ export const NOD_ENDPOINTS: readonly NodEndpoint[] = [
   // Teams and management
   { path: "/api/teams", page: "Teams", what: "Sales teams and salespeople: targets, sales, collections, win rates.", filters: true },
   { path: "/api/targets", page: "Teams", what: "Monthly targets.", params: ["month"] },
-  { path: "/api/management-review", page: "Management review", what: "The management review figures for a month.", params: ["month"] },
+  { path: "/api/management-review", page: "Management review", what: "Review for the global date/filter window; selectedPeriod is authoritative. Full monthly media-plan targets are separate from employee sales targets. Legacy month is used only without explicit dates.", filters: true, params: ["month"] },
   { path: "/api/daily-updates", page: "Daily updates", what: "Daily course KPIs.", params: ["day"], filters: true },
   { path: "/api/weekend", page: "Weekend", what: "Weekend versus weekday performance.", filters: true },
   { path: "/api/yoy", page: "Year over year", what: "Year-over-year comparison.", params: ["year", "month"] },

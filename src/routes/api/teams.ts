@@ -11,6 +11,22 @@ export const Route = createFileRoute("/api/teams")({
 
         const filters = await parseFilters(request);
         const data = await getFiltered(filters);
+        const { authoritativeLostLeads } = await import("@/lib/metrics.server");
+        const { buildLeadOwnershipAudit } = await import("@/lib/lead-ownership-audit");
+        const ownershipAudit = buildLeadOwnershipAudit([
+          ...data.crm.map((row) => ({
+            id: row.id,
+            salesperson: row.salesperson,
+            status: row.isWon ? "won" : row.businessStatus,
+            lossReason: row.lossReason,
+          })),
+          ...authoritativeLostLeads(data).map((row) => ({
+            id: row.id,
+            salesperson: row.salesperson,
+            status: "lost",
+            lossReason: row.lossReason,
+          })),
+        ]);
         const teams = computeTeams(data);
         const { buildAgentAnalytics } = await import("@/lib/agent-analytics.server");
         const agentAnalytics = await buildAgentAnalytics(data, filters, teams);
@@ -64,6 +80,7 @@ export const Route = createFileRoute("/api/teams")({
         );
 
         return json({
+          ownershipAudit,
           teams,
           ...agentAnalytics,
           leaderboard,

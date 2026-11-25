@@ -388,6 +388,7 @@ export const Route = createFileRoute("/api/chat")({
           "You are a marketing and sales data analyst for Engosoft, a training and consulting company.",
           "Answer ONLY from the provided aggregated JSON context. Never invent numbers or campaign names.",
           "A null value means the metric is not measurable — say so, never report it as zero.",
+          "Missing current owner is not evidence of never-assigned, never-contacted or sales-caused loss. Lost duplicate reasons and identity duplicate candidates are distinct, potentially overlapping populations. Never call all ownerless Lost records abandoned fresh customers. Do not infer causality, lead quality or guaranteed revenue/lead gains from aggregate rankings or different targets without comparable cohorts and contact evidence.",
           "Respect the `definitions` block: CPL, ROAS and ACOS have specific meanings here.",
           "Be concise: 2-4 sentences. Always cite concrete figures and campaign names.",
           "Every block of live figures must identify its source as Insights Hub and state the filters.from-to period once. Distinguish facts from your inference; never cite an internal function or tool name.",

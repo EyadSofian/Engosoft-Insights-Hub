@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import {
   ArrowLeft,
   ChartNoAxesCombined,
@@ -12,6 +12,7 @@ import { DashboardPageHeader } from "@/components/dashboard-bits";
 import { Card, ErrorState, Skeleton } from "@/components/ui-bits";
 import { fmtNum, fmtPct, fmtUSDFull, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
+import { filterStore } from "@/lib/filter-store";
 
 export const Route = createFileRoute("/management-review")({ component: ManagementReviewPage });
 
@@ -94,6 +95,7 @@ interface ReviewRow {
 }
 
 interface ReviewResponse {
+  selectedPeriod: { from: string; to: string };
   selectedMonth: string;
   today: string;
   months: string[];
@@ -144,10 +146,7 @@ function SummaryMetric({
 function ManagementReviewPage() {
   const { lang } = useI18n();
   const ar = lang === "ar";
-  const [month, setMonth] = useState("");
-  const { data, isLoading, error, refetch } = useApi<ReviewResponse>(
-    `/api/management-review${month ? `?month=${month}` : ""}`,
-  );
+  const { data, isLoading, error, refetch } = useApi<ReviewResponse>("/api/management-review");
   useEffect(() => {
     if (data?.historical.status !== "refreshing" || data.historical.funnelReady) return;
     const timer = window.setInterval(() => {
@@ -182,26 +181,12 @@ function ManagementReviewPage() {
           title={ar ? "مراجعة الأداء والخطة" : "Performance & plan review"}
           subtitle={
             ar
-              ? "من 2025 حتى الآن · مسار الليدز، أسباب الفقد، والخطة مقابل التنفيذ."
-              : "2025 to date · lead funnel, loss reasons and target versus actual."
+              ? "الفترة من فلتر التاريخ العلوي · مسار الليدز، أسباب الفقد، والخطة مقابل التنفيذ."
+              : "Follows the top-bar date filter · lead funnel, loss reasons and target versus actual."
           }
-          period={`${row.month}-01 → ${row.month === data.today.slice(0, 7) ? data.today : new Date(Date.UTC(Number(row.month.slice(0, 4)), Number(row.month.slice(5, 7)), 0)).toISOString().slice(0, 10)}`}
+          period={`${data.selectedPeriod.from} → ${data.selectedPeriod.to}`}
         />
         <div className="flex flex-wrap items-end gap-2">
-          <label className="text-xs font-semibold text-text-muted">
-            {ar ? "شهر المراجعة" : "Review month"}
-            <select
-              className="mt-1 block min-w-44 rounded-xl border border-border bg-surface px-3 py-2 text-sm text-text"
-              value={row.month}
-              onChange={(event) => setMonth(event.target.value)}
-            >
-              {[...data.months].reverse().map((value) => (
-                <option key={value} value={value}>
-                  {monthName(value, lang)}
-                </option>
-              ))}
-            </select>
-          </label>
           <Link
             to="/media-plan"
             className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-surface px-3 text-xs font-semibold text-brand"
@@ -215,7 +200,7 @@ function ManagementReviewPage() {
       <Card className="border-brand/20 bg-gradient-to-l from-brand/5 to-surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-bold text-text">
-            {ar ? "قرار الإدارة قبل خطة الشهر القادم" : "Management baseline for next month"}
+            {ar ? "مراجعة الفترة المختارة" : "Selected-period review"}
           </h2>
           <span className="rounded-full border border-border bg-surface px-3 py-1 text-[12px] font-semibold text-text-muted">
             {row.planStatus === "approved"
@@ -227,13 +212,13 @@ function ManagementReviewPage() {
                   ? "خطة مسودة — ليست تارجت معتمد"
                   : "Draft — not approved"
                 : ar
-                  ? "لا توجد خطة محفوظة لهذا الشهر"
-                  : "No saved plan for this month"}
+                  ? "لا توجد خطة كاملة للنطاق المختار"
+                  : "No complete plan for this scope"}
           </span>
         </div>
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <SummaryMetric
-            label={ar ? "تحقيق تارجت المبيعات" : "Revenue target achievement"}
+            label={ar ? "تحقيق خطة الميديا · التحصيل" : "Media-plan revenue achievement"}
             value={percent(row.achievement.revenue)}
             detail={`${money(row.actual.revenue)} / ${money(row.target.revenue)}`}
             tone="green"
@@ -245,7 +230,7 @@ function ManagementReviewPage() {
             tone="amber"
           />
           <SummaryMetric
-            label={ar ? "ليدز Odoo المنشأة في الشهر" : "CRM leads created this month"}
+            label={ar ? "ليدز Odoo المنشأة في الفترة" : "CRM leads created in period"}
             value={number(row.actual.crmLeads)}
             detail={
               ar
@@ -279,11 +264,17 @@ function ManagementReviewPage() {
             {ar
               ? row.month === "2026-09"
                 ? "تارجت المبيعات 135,000$ وميزانية التسويق 22,950$ (17%) بتصحيح الإدارة. توزيع الليدز والدورات والأنشطة من أغسطس ما زال مسودة، فلا تعتبر تحقيق تارجت الليدز نهائيًا."
-                : `تنبيه: تارجت ${monthName(row.month, lang)} مسودة${row.planBasisMonth ? ` منسوخة من ${monthName(row.planBasisMonth, lang)}` : ""}، فلا تعتبر نسبة التحقيق حكمًا نهائيًا حتى اعتماد الخطة.`
+                : "تنبيه: الخطة مسودة؛ لا تعتبر نسبة التحقيق حكمًا نهائيًا حتى اعتماد الخطة."
               : "Draft targets are provisional and must be approved before treating achievement as final."}
           </p>
         )}
       </Card>
+
+      <p className="text-xs leading-6 text-text-muted">
+        {ar
+          ? "التحصيل بتاريخ الدفع للمدة المحددة بالضبط، وليس بتاريخ الفاتورة. التارجت من خطة الميديا للشهور المشمولة بالكامل دون تقسيمه على الأيام، وليس تارجت فريق السيلز؛ قد يختلف عنه. مع فلتر فرعي لا نخمن تارجتًا موزعًا. للتحويل المدفوع وأدلة الاتصال استخدم تقرير أداء الليدز، ولا تستنتج سبب التعثر من مقارنة نسب التارجت وحدها."
+          : "Collections follow payment dates in the exact selected window, not invoice dates. Targets are full saved media-plan months, not day-prorated or employee team quotas, and may differ from them. Subscope targets are not guessed. Use lead performance for paid conversion and contact evidence; target percentages alone do not establish the cause of a shortfall."}
+      </p>
 
       <div className="grid gap-5 xl:grid-cols-2">
         <Card className="p-5">
@@ -338,17 +329,17 @@ function ManagementReviewPage() {
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             <SummaryMetric
-              label={ar ? "Lost ليدز الشهر (حالتها الآن)" : "Created this month, now Lost"}
+              label={ar ? "ليدز الفترة المفقودة حاليًا" : "Period entries currently Lost"}
               value={row.funnelAvailable ? percent(f.lostRate) : "—"}
               detail={`${row.funnelAvailable ? number(f.lost) : "—"} / ${row.funnelAvailable ? number(f.leads) : "—"}`}
               tone="red"
             />
             <SummaryMetric
-              label={ar ? "Lost اتقفلت خلال الشهر · كل الليدز" : "All leads closed Lost this month"}
+              label={ar ? "Lost اتقفلت خلال الفترة · كل الليدز" : "All leads closed Lost in period"}
               value={number(row.lostMovement.closedInMonth)}
               detail={
                 ar
-                  ? `${number(row.lostMovement.createdAndClosedInMonth)} من ليدز الشهر + ${number(row.lostMovement.olderCreatedClosedInMonth)} أقدم + ${number(row.lostMovement.undatedCreatedClosedInMonth)} تاريخها غير صالح`
+                  ? `${number(row.lostMovement.createdAndClosedInMonth)} من ليدز الفترة + ${number(row.lostMovement.olderCreatedClosedInMonth)} أقدم + ${number(row.lostMovement.undatedCreatedClosedInMonth)} تاريخها غير صالح`
                   : `${number(row.lostMovement.createdAndClosedInMonth)} new + ${number(row.lostMovement.olderCreatedClosedInMonth)} older + ${number(row.lostMovement.undatedCreatedClosedInMonth)} undated`
               }
               tone="red"
@@ -495,12 +486,12 @@ function ManagementReviewPage() {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <div>
             <h2 className="text-base font-bold text-text">
-              {ar ? "مسار الشهور · 2025 حتى الآن" : "Monthly trend · 2025 to date"}
+              {ar ? "الشهور داخل الفترة المختارة" : "Months within the selected period"}
             </h2>
             <p className="text-xs text-text-muted">
               {ar
-                ? "اضغط على شهر لفتح تفسيره وأسباب الفقد فيه."
-                : "Select a month for its detailed funnel."}
+                ? "اضغط على شهر لتحديث فلتر التاريخ العلوي إليه."
+                : "Select a month to set the top-bar date filter to it."}
             </p>
           </div>
           <Clock3 size={18} className="text-brand" />
@@ -524,10 +515,32 @@ function ManagementReviewPage() {
               {[...data.rows].reverse().map((item) => (
                 <tr
                   key={item.month}
-                  onClick={() => setMonth(item.month)}
-                  className={`cursor-pointer border-b border-border/70 transition-colors hover:bg-brand/5 ${item.month === row.month ? "bg-brand/10" : ""}`}
+                  className={`border-b border-border/70 transition-colors hover:bg-brand/5 ${item.month === row.month ? "bg-brand/10" : ""}`}
                 >
-                  <td className="p-3 font-semibold text-text">{monthName(item.month, lang)}</td>
+                  <td className="p-3 font-semibold text-text">
+                    <button
+                      type="button"
+                      className="rounded text-start text-brand underline-offset-4 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+                      onClick={() =>
+                        filterStore.setDates(
+                          item.month + "-01",
+                          item.month === data.today.slice(0, 7)
+                            ? data.today
+                            : new Date(
+                                Date.UTC(
+                                  Number(item.month.slice(0, 4)),
+                                  Number(item.month.slice(5, 7)),
+                                  0,
+                                ),
+                              )
+                                .toISOString()
+                                .slice(0, 10),
+                        )
+                      }
+                    >
+                      {monthName(item.month, lang)}
+                    </button>
+                  </td>
                   <td className="num p-3 text-end">
                     {item.funnelAvailable ? number(item.funnel.leads) : "—"}
                   </td>

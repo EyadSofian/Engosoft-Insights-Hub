@@ -1,3 +1,4 @@
+import { LEAD_OWNERSHIP_INTERPRETATION } from "./lead-ownership-audit";
 /**
  * THE AGENT SURFACE CONTRACT — what every analytical surface promises an agent.
  *
@@ -210,6 +211,7 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
         required: true,
         why: "Company-wide KPIs, deltas, best/worst performers and the funnel.",
         summaryPaths: [
+          "ownershipAudit",
           "activity.best",
           "activity.worst",
           "best",
@@ -228,7 +230,7 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
         as: "teamAggregates",
         required: false,
         why: "The monthly target and achievement block the overview renders but does not serve.",
-        summaryPaths: ["targets", "chatwoot", "summary", ...HEALTH_PATHS],
+        summaryPaths: ["targets", "chatwoot", "summary", "ownershipAudit", ...HEALTH_PATHS],
       },
       {
         endpoint: "/api/marketing-costs",
@@ -239,7 +241,7 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
       },
     ],
     freshnessPaths: ["syncedAt", "health"],
-    caveats: [ATTRIBUTION_CAVEAT, COLLECTION_BASIS_CAVEAT],
+    caveats: [ATTRIBUTION_CAVEAT, COLLECTION_BASIS_CAVEAT, LEAD_OWNERSHIP_INTERPRETATION],
   },
   {
     id: "campaigns",
@@ -723,7 +725,15 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
      */
     defaultViews: ["crm"],
     operations: ["summary", "list", "trend"],
-    filters: [...PERIOD_FILTERS, "source", "course", "salesTeam", "salesperson", "campaign"],
+    filters: [
+      ...PERIOD_FILTERS,
+      "source",
+      "course",
+      "salesTeam",
+      "salesperson",
+      "campaign",
+      "month",
+    ],
     entities: ["source", "course", "salesperson"],
     sources: [
       {
@@ -732,6 +742,7 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
         required: true,
         why: "The CRM funnel: leads by stage, source, course, team and campaign.",
         summaryPaths: [
+          "ownershipAudit",
           "detail",
           "health",
           "health.accountingDirect",
@@ -762,7 +773,7 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
         endpoint: "/api/uncalled-leads",
         as: "uncalled",
         required: false,
-        why: "Leads distributed but never called — the follow-up gap behind a conversion drop.",
+        why: "Explicit contact-evidence report only. Do not infer never-called from missing current owner or Lost status.",
         summaryPaths: ["summary", "range", "leads"],
       },
       {
@@ -777,7 +788,14 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
         required: false,
         views: ["performance"],
         why: "Entry-month cohorts: duplicate and unqualified rates, call attempts, first-contact lag, and conversion to a verified paid enrollment.",
-        summaryPaths: ["selected", "coverage", "availability"],
+        summaryPaths: [
+          "selectedMonth",
+          "asOf",
+          "selected",
+          "coverage",
+          "availability",
+          "ownershipAudit",
+        ],
       },
       {
         endpoint: "/api/lead-intelligence",
@@ -812,6 +830,26 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
     ],
     rows: [
       {
+        collection: "cohorts.bySalesOwner",
+        kind: "current_crm_owner",
+        fields: [
+          "name",
+          "leads",
+          "lost",
+          "confirmedDuplicate",
+          "duplicateSameMonth",
+          "duplicateEarlierMonth",
+          "crmWon",
+          "contact0",
+          "contact1",
+          "contact2",
+          "contact3Plus",
+          "paidLeads",
+          "conversionRate",
+        ],
+        limit: 60,
+      },
+      {
         collection: "bySource",
         kind: "source",
         fields: ["name", "label", "leads", "won", "lost", "conversionRate", "revenue"],
@@ -826,6 +864,7 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
     ],
     freshnessPaths: ["health"],
     caveats: [
+      LEAD_OWNERSHIP_INTERPRETATION,
       t(
         "أرقام الليدز مجمّعة. بيانات التواصل الشخصية مش بتوصل للمساعد أصلًا.",
         "Lead figures are aggregates. Personal contact details never reach the assistant at all.",
@@ -876,6 +915,7 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
     ],
     freshnessPaths: ["health"],
     caveats: [
+      LEAD_OWNERSHIP_INTERPRETATION,
       t(
         "سبب الخسارة بيتكتب يدوي من المندوب، فهو رأي مش قياس.",
         "The loss reason is typed by the rep — it is an opinion, not a measurement.",
@@ -904,6 +944,7 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
         required: true,
         why: "Targets, achievement, per-rep conversion and each person's course mix.",
         summaryPaths: [
+          "ownershipAudit",
           "chatwoot",
           "health",
           "health.accountingDirect",
@@ -984,6 +1025,7 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
     freshnessPaths: ["sla", "callsHub", "chatwoot", "health"],
     caveats: [
       COLLECTION_BASIS_CAVEAT,
+      LEAD_OWNERSHIP_INTERPRETATION,
       t(
         "دي أرقام أداء، مش تقييم موظف. مينفعش تتاخد كقرار توظيف أو فصل أو حافز.",
         "These are performance figures, not an employee evaluation. They are not a hiring, firing or compensation decision.",
@@ -1223,7 +1265,25 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
     sensitivity: "internal",
     views: [],
     operations: ["summary", "list", "compare", "trend"],
-    filters: ["month"],
+    filters: [
+      ...PERIOD_FILTERS,
+      "month",
+      "course",
+      "platform",
+      "account",
+      "channel",
+      "source",
+      "mainCategory",
+      "salesTeam",
+      "salesperson",
+      "company",
+      "campaign",
+      "campaignKey",
+      "adset",
+      "adsetKey",
+      "ad",
+      "adKey",
+    ],
     entities: ["course"],
     sources: [
       {
@@ -1232,6 +1292,9 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
         required: true,
         why: "Monthly Odoo creation cohorts, canonical Lost, paid revenue, platform spend and saved media-plan targets.",
         summaryPaths: [
+          "selectedPeriod",
+          "appliedFilters",
+          "targetBasis",
           "selected.month",
           "selected.coverage",
           "selected.target",
@@ -1268,6 +1331,10 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
     ],
     freshnessPaths: ["today", "historical.syncedAt"],
     caveats: [
+      t(
+        "مراجعة الإدارة تتبع فلتر التاريخ العلوي. تحقق من selectedPeriod قبل المقارنة. الخطة هي خطة الميديا الشهرية الكاملة وليست تارجت الموظفين؛ نسبة تحقيق التارجت ليست معدل تحويل الليدز.",
+        "Management review follows the top-bar date filter. Check selectedPeriod before comparing. Targets are full saved monthly media plans, not employee sales targets; target attainment is not lead conversion.",
+      ),
       t(
         "حالة الـWon/Lost الحالية محسوبة على شهر إنشاء الليد، وليست لقطة بنهاية ذلك الشهر. تحويل Fresh/Old Data يقتصر على الليدز الموسومة في Odoo.",
         "Current Won/Lost states are attributed to creation month, not saved month-end states. Fresh/Old conversion uses only explicitly tagged Odoo leads.",

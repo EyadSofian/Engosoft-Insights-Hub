@@ -55,6 +55,26 @@ const base = () => ({
 });
 
 describe("six-month lead performance", () => {
+  it("includes only the selected creation cohort in its ownership audit and preserves duplicate classification", () => {
+    const result = buildLeadPerformance({
+      ...base(),
+      leads: [
+        lead("repeat", "2026-05-03", { status: "lost", lossReason: "ليد مكرر", salesperson: "" }),
+        lead("lead", "2026-05-04", { salesperson: "" }),
+        lead("older", "2026-04-28", { salesperson: "" }),
+        lead("broadcast", "2026-05-04", { salesperson: "", source: "WhatsApp Broadcast" }),
+      ],
+    });
+    expect(result.ownershipAudit).toMatchObject({
+      totalRecords: 2,
+      currentOwnerMissing: 2,
+      currentOwnerMissingRecordedDuplicateLost: 1,
+      currentOwnerMissingOpenOrLead: 1,
+      neverContacted: null,
+      neverAssigned: null,
+    });
+    expect(result.selected.leads).toBe(2);
+  });
   it("uses calendar creation cohorts and excludes broadcast/recommendation even under Facebook", () => {
     expect(sixCalendarMonths("2026-10-23")).toEqual([
       "2026-05",

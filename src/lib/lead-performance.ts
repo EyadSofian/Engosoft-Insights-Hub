@@ -3,6 +3,7 @@ import { PLATFORM_SOURCE_KEYS } from "./acquisition-channel";
 import { normalizePhone, phoneMatchKey, samePhoneIdentity } from "./lead-contact-evidence";
 import { canonicalLossReason } from "./loss-reason-taxonomy";
 import { mediaBuyerForCampaign, MEDIA_BUYERS } from "./media-buyers";
+import { buildLeadOwnershipAudit } from "./lead-ownership-audit";
 
 export interface PerformanceLead {
   id: string;
@@ -153,6 +154,7 @@ export interface PerformanceStage {
 }
 
 export interface PerformanceResult {
+  ownershipAudit: ReturnType<typeof buildLeadOwnershipAudit>;
   asOf: string;
   months: string[];
   selectedMonth: string;
@@ -703,6 +705,7 @@ export function buildLeadPerformance(input: {
     groups(records, key, coverage.callsAvailable, input.asOf);
   return {
     asOf: input.asOf,
+    ownershipAudit: buildLeadOwnershipAudit(selectedRecords),
     months,
     selectedMonth,
     rows,
