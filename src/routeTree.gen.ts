@@ -74,6 +74,7 @@ import { Route as ApiLostArchiveAuditRouteImport } from './routes/api/lost-archi
 import { Route as ApiLostChatterRouteImport } from './routes/api/lost-chatter'
 import { Route as ApiManagementReviewRouteImport } from './routes/api/management-review'
 import { Route as ApiMarketingCostsRouteImport } from './routes/api/marketing-costs'
+import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as ApiMediaBuyersRouteImport } from './routes/api/media-buyers'
 import { Route as ApiMediaPlanRouteImport } from './routes/api/media-plan'
 import { Route as ApiMediaPlanActivityRouteImport } from './routes/api/media-plan-activity'
@@ -474,6 +475,11 @@ const ApiManagementReviewRoute = ApiManagementReviewRouteImport.update({
 const ApiMarketingCostsRoute = ApiMarketingCostsRouteImport.update({
   id: '/api/marketing-costs',
   path: '/api/marketing-costs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMcpRoute = ApiMcpRouteImport.update({
+  id: '/api/mcp',
+  path: '/api/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMediaBuyersRoute = ApiMediaBuyersRouteImport.update({
@@ -920,6 +926,7 @@ export interface FileRoutesByFullPath {
   '/api/lost-chatter': typeof ApiLostChatterRoute
   '/api/management-review': typeof ApiManagementReviewRoute
   '/api/marketing-costs': typeof ApiMarketingCostsRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
   '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
@@ -1059,6 +1066,7 @@ export interface FileRoutesByTo {
   '/api/lost-chatter': typeof ApiLostChatterRoute
   '/api/management-review': typeof ApiManagementReviewRoute
   '/api/marketing-costs': typeof ApiMarketingCostsRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
   '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
@@ -1199,6 +1207,7 @@ export interface FileRoutesById {
   '/api/lost-chatter': typeof ApiLostChatterRoute
   '/api/management-review': typeof ApiManagementReviewRoute
   '/api/marketing-costs': typeof ApiMarketingCostsRoute
+  '/api/mcp': typeof ApiMcpRoute
   '/api/media-buyers': typeof ApiMediaBuyersRoute
   '/api/media-plan': typeof ApiMediaPlanRoute
   '/api/media-plan-activity': typeof ApiMediaPlanActivityRoute
@@ -1340,6 +1349,7 @@ export interface FileRouteTypes {
     | '/api/lost-chatter'
     | '/api/management-review'
     | '/api/marketing-costs'
+    | '/api/mcp'
     | '/api/media-buyers'
     | '/api/media-plan'
     | '/api/media-plan-activity'
@@ -1479,6 +1489,7 @@ export interface FileRouteTypes {
     | '/api/lost-chatter'
     | '/api/management-review'
     | '/api/marketing-costs'
+    | '/api/mcp'
     | '/api/media-buyers'
     | '/api/media-plan'
     | '/api/media-plan-activity'
@@ -1618,6 +1629,7 @@ export interface FileRouteTypes {
     | '/api/lost-chatter'
     | '/api/management-review'
     | '/api/marketing-costs'
+    | '/api/mcp'
     | '/api/media-buyers'
     | '/api/media-plan'
     | '/api/media-plan-activity'
@@ -1758,6 +1770,7 @@ export interface RootRouteChildren {
   ApiLostChatterRoute: typeof ApiLostChatterRoute
   ApiManagementReviewRoute: typeof ApiManagementReviewRoute
   ApiMarketingCostsRoute: typeof ApiMarketingCostsRoute
+  ApiMcpRoute: typeof ApiMcpRoute
   ApiMediaBuyersRoute: typeof ApiMediaBuyersRoute
   ApiMediaPlanRoute: typeof ApiMediaPlanRoute
   ApiMediaPlanActivityRoute: typeof ApiMediaPlanActivityRoute
@@ -2287,6 +2300,13 @@ declare module '@tanstack/react-router' {
       path: '/api/marketing-costs'
       fullPath: '/api/marketing-costs'
       preLoaderRoute: typeof ApiMarketingCostsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mcp': {
+      id: '/api/mcp'
+      path: '/api/mcp'
+      fullPath: '/api/mcp'
+      preLoaderRoute: typeof ApiMcpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/media-buyers': {
@@ -2862,6 +2882,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLostChatterRoute: ApiLostChatterRoute,
   ApiManagementReviewRoute: ApiManagementReviewRoute,
   ApiMarketingCostsRoute: ApiMarketingCostsRoute,
+  ApiMcpRoute: ApiMcpRoute,
   ApiMediaBuyersRoute: ApiMediaBuyersRoute,
   ApiMediaPlanRoute: ApiMediaPlanRoute,
   ApiMediaPlanActivityRoute: ApiMediaPlanActivityRoute,
