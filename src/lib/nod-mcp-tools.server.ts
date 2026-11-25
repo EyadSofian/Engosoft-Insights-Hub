@@ -172,6 +172,14 @@ const getEndpoint: McpTool = {
       body && typeof body === "object" && "ownershipAudit" in body
         ? (body as Record<string, unknown>).ownershipAudit
         : undefined;
+    const reportingContext =
+      body && typeof body === "object"
+        ? Object.fromEntries(
+            ["selectedPeriod", "appliedFilters", "selectedMonth", "asOf", "targetBasis"]
+              .filter((key) => key in body)
+              .map((key) => [key, (body as Record<string, unknown>)[key]]),
+          )
+        : {};
     return {
       endpoint: match.path,
       page: match.entry.page,
@@ -179,6 +187,8 @@ const getEndpoint: McpTool = {
       ...slice,
       // Must survive path/offset slicing: one isolated owner row is not its evidence contract.
       ...(audit ? { ownershipAudit: audit } : {}),
+      // Reading one nested table must not detach it from its effective period/target basis.
+      reportingContext,
       interpretationRules: LEAD_OWNERSHIP_INTERPRETATION,
     };
   },

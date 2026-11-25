@@ -248,16 +248,16 @@ export const Route = createFileRoute("/api/management-review")({
             },
             budget: {
               actualRevenueAllowance:
-                revenue === null || month !== "2026-09" ? null : revenue * 0.17,
+                !plan || revenue === null || month !== "2026-09" ? null : revenue * 0.17,
               actualRevenueUtilization:
-                revenue === null || spend === null || month !== "2026-09"
+                !plan || revenue === null || spend === null || month !== "2026-09"
                   ? null
                   : rate(spend, revenue * 0.17),
               actualGrossAllowance:
-                revenue === null || month !== "2026-09"
+                !plan || revenue === null || month !== "2026-09"
                   ? null
                   : (revenue + certificateRevenue) * 0.17,
-              targetRate: month === "2026-09" ? 0.17 : null,
+              targetRate: plan && month === "2026-09" ? 0.17 : null,
             },
             lostMovement: {
               closedInMonth: lostCounts?.closedLostInPeriod ?? null,
