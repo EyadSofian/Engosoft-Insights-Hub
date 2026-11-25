@@ -1,25 +1,146 @@
 /**
  * The tools Insights Hub offers an outside agent (Nod) over MCP.
  *
- * Reads go through the same closed-vocabulary gateway as ENGO Nexus
- * (`readSurface`), so the agent names a surface, a view and an operation and
- * never builds a URL. The one action is the dashboard's own "refresh data"
- * button, with the same two-minute cooldown.
+ * Two ways to read. `insights_read` answers through the same curated gateway
+ * as ENGO Nexus (`readSurface`): headline figures with caveats. `insights_get`
+ * returns the full JSON of any page's endpoint from `nod-mcp-catalog.ts`, so
+ * every ad set, creative, lead and row is reachable, paged when large. The one
+ * action is the dashboard's own "refresh data" button, with its cooldown.
  */
 import { SURFACE_CONTRACTS } from "./agent-surface-contract";
 import { AGENT_READABLE_SURFACES } from "./agent-insights-registry";
 import { readSurface } from "./agent-surface-gateway.server";
 import { McpToolError, str, type McpServerSpec, type McpTool } from "./mcp-core.server";
-
-/** Calls the dashboard's own endpoints as a trusted service, in case read sign-in is enforced. */
-const serviceFetch: typeof fetch = (input, init = {}) => {
-  const headers = new Headers(init.headers);
-  const secret = process.env.INTERNAL_API_SECRET?.trim();
-  if (secret) headers.set("x-service-secret", secret);
-  return fetch(input, { ...init, headers });
-};
+import { NOD_ENDPOINTS, NOD_STRIPPED_PARAMS, STANDARD_FILTERS, matchNodEndpoint } from "./nod-mcp-catalog";
+import { SLICE_INPUT_PROPERTIES, sliceJson } from "./mcp-json-slice";
+import { issuePnlCookie, pnlGuardApplies } from "./profitability-access.server";
+import { issueRevenueSessionCookie, revenueGuardApplies } from "./revenue-access.server";
 
 const originOf = (request: Request) => new URL(request.url).origin;
+
+/** First `name=value` pair of a Set-Cookie string, for a Cookie header. */
+const cookiePair = (setCookie: string | null) => (setCookie ? setCookie.split(";")[0] : "");
+
+/**
+ * The credentials a page's own request would carry, for a server-side read.
+ *
+ * Runs inside the dashboard's own server, so it presents the service secret,
+ * the admin code and, for the P&L and revenue pages, a freshly signed gate
+ * cookie. None of those values ever leave the process: the agent only ever
+ * holds NOD_MCP_TOKEN. The owner chose to open the P&L to Nod on 2026-11-25.
+ */
+function trustedHeaders(url: URL, base?: HeadersInit): Headers {
+  const headers = new Headers(base);
+  const service = process.env.INTERNAL_API_SECRET?.trim();
+  if (service) headers.set("x-service-secret", service);
+  const admin = process.env.DASHBOARD_ADMIN_SECRET?.trim();
+  if (admin) headers.set("x-admin-secret", admin);
+  const probe = new Request(url);
+  const cookies: string[] = [];
+  try {
+    if (pnlGuardApplies(probe)) cookies.push(cookiePair(issuePnlCookie()));
+  } catch {
+    // P&L lock not configured: the route answers on its own terms.
+  }
+  if (revenueGuardApplies(probe)) cookies.push(cookiePair(issueRevenueSessionCookie()));
+  const cookie = cookies.filter(Boolean).join("; ");
+  if (cookie) headers.set("cookie", cookie);
+  return headers;
+}
+
+/** Calls the dashboard's own endpoints as a trusted service; used by the surface gateway too. */
+const serviceFetch: typeof fetch = (input, init = {}) => {
+  const url = new URL(input instanceof Request ? input.url : String(input));
+  return fetch(input, { ...init, headers: trustedHeaders(url, init.headers) });
+};
+
+/**
+ * Reads one dashboard endpoint exactly as its page does.
+ */
+async function fullRead(origin: string, path: string, params: URLSearchParams) {
+  const url = new URL(path, origin);
+  for (const [key, value] of params) if (!NOD_STRIPPED_PARAMS.has(key)) url.searchParams.set(key, value);
+  const headers = trustedHeaders(url, { accept: "application/json" });
+  const response = await fetch(url, { headers, redirect: "manual" });
+  const type = response.headers.get("content-type") ?? "";
+  if (!type.includes("json")) {
+    throw new McpToolError(
+      `${path} answered HTTP ${response.status} with ${type || "no content type"}, not JSON.`,
+    );
+  }
+  return { status: response.status, body: (await response.json()) as unknown };
+}
+
+const listEndpoints: McpTool = {
+  name: "insights_list_endpoints",
+  title: "List every dashboard data endpoint",
+  description:
+    "Lists every data endpoint behind every page and tab of the dashboard (campaigns, every ad set and ad, creatives, leads, CRM, lost, teams, calls, sales, accounting, P&L, courses, pricing, attribution, media plan, …) with the parameters each accepts. Use insights_get to read any of them in full.",
+  inputSchema: {
+    type: "object",
+    properties: { page: { type: "string", description: "Optional page name to narrow the list, e.g. Ads or Leads." } },
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  run: async (args) => {
+    const page = str(args, "page").toLowerCase();
+    const endpoints = NOD_ENDPOINTS.filter((endpoint) => !page || endpoint.page.toLowerCase().includes(page));
+    return {
+      count: endpoints.length,
+      endpoints: endpoints.map((endpoint) => ({
+        path: endpoint.path,
+        page: endpoint.page,
+        what: endpoint.what,
+        ...(endpoint.params ? { params: endpoint.params } : {}),
+        ...(endpoint.filters ? { standardFilters: true } : {}),
+      })),
+      standardFilters: STANDARD_FILTERS,
+      paging:
+        "insights_get returns small answers whole. A large one comes back as an outline; then pass path (e.g. \"rows\") and page lists with offset/limit until nextOffset is gone.",
+    };
+  },
+};
+
+const getEndpoint: McpTool = {
+  name: "insights_get",
+  title: "Read any dashboard endpoint in full",
+  description:
+    "Reads one endpoint from insights_list_endpoints and returns its full data: every row, ad set, ad, creative, lead and figure the page shows. Large answers come back as an outline first; then read parts with path, and page through lists with offset and limit.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      endpoint: { type: "string", description: "Path from insights_list_endpoints, e.g. /api/ads." },
+      params: {
+        type: "object",
+        description: "Query parameters, e.g. {\"from\":\"2026-11-01\",\"to\":\"2026-11-25\",\"company\":\"2\"}.",
+        additionalProperties: { type: ["string", "number", "boolean"] },
+      },
+      ...SLICE_INPUT_PROPERTIES,
+    },
+    required: ["endpoint"],
+    additionalProperties: false,
+  },
+  annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  run: async (args, { request }) => {
+    const match = matchNodEndpoint(str(args, "endpoint", true));
+    if (!match) throw new McpToolError("Unknown endpoint. Call insights_list_endpoints for the valid paths.");
+    const raw = args.params;
+    if (raw !== undefined && (typeof raw !== "object" || raw === null || Array.isArray(raw))) {
+      throw new McpToolError('"params" must be an object.');
+    }
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries((raw ?? {}) as Record<string, unknown>)) {
+      if (value !== undefined && value !== null && value !== "") params.set(key, String(value));
+    }
+    const { status, body } = await fullRead(originOf(request), match.path, params);
+    const slice = sliceJson(body, {
+      path: typeof args.path === "string" ? args.path : "",
+      offset: typeof args.offset === "number" ? args.offset : undefined,
+      limit: typeof args.limit === "number" ? args.limit : undefined,
+    });
+    return { endpoint: match.path, page: match.entry.page, httpStatus: status, ...slice };
+  },
+};
 
 const listSurfaces: McpTool = {
   name: "insights_list_surfaces",
@@ -128,6 +249,6 @@ export const INSIGHTS_MCP: McpServerSpec = {
   name: "engosoft-insights-hub",
   version: "1.0.0",
   instructions:
-    "Engosoft Insights Hub: marketing & sales figures for Engosoft (Egypt, KSA, UAE). Start with insights_list_surfaces, then insights_read. Revenue is collected cash from Odoo by payment date. Report each figure with its period and any caveat the result carries. Answer in the owner's language; the data labels are Arabic-first.",
-  tools: [listSurfaces, read, refresh],
+    "Engosoft Insights Hub: marketing & sales figures for Engosoft (Egypt, KSA, UAE). For headline answers use insights_list_surfaces then insights_read. For full detail (every ad set, ad, creative, lead, invoice and row a page shows) use insights_list_endpoints then insights_get. Revenue is collected cash from Odoo by payment date. Report each figure with its period and any caveat the result carries. Answer in the owner's language; the data labels are Arabic-first.",
+  tools: [listSurfaces, read, listEndpoints, getEndpoint, refresh],
 };
