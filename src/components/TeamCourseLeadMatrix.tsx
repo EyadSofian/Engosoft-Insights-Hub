@@ -1,10 +1,10 @@
 import { useEffect, useId, useState } from "react";
-import { ExternalLink, Search, TableProperties } from "lucide-react";
+import { CalendarDays, Download, ExternalLink, Search, TableProperties } from "lucide-react";
 import { Card, ErrorState, Skeleton } from "@/components/ui-bits";
 import { DetailPanel } from "@/components/DetailPanel";
 import { fmtNum, useI18n } from "@/lib/i18n";
 import { useApi } from "@/lib/use-api";
-import { useFilters } from "@/lib/filter-store";
+import { filterStore, useFilters } from "@/lib/filter-store";
 import type { TeamCourseLeadPage, TeamCourseMatrix } from "@/lib/team-course-leads";
 
 type Selection = { ownerKey: string; name: string; course: string; count: number };
@@ -24,9 +24,18 @@ export function TeamCourseLeadMatrix({
   const filters = useFilters();
   const searchId = useId();
   const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState(filters.from || "");
+  const [dateTo, setDateTo] = useState(filters.to || "");
+  const [dateError, setDateError] = useState(false);
+  const [exportState, setExportState] = useState<"idle" | "working" | "error">("idle");
   const [selected, setSelected] = useState<Selection | null>(null);
   // A drill-down must never outlive the filter scope its number came from.
   useEffect(() => setSelected(null), [filters]);
+  useEffect(() => {
+    setDateFrom(filters.from || "");
+    setDateTo(filters.to || "");
+    setDateError(false);
+  }, [filters.from, filters.to]);
   const unowned = ar ? "بدون مسؤول حالي" : "No current owner";
   const nameFor = (row: TeamCourseMatrix["rows"][number]) =>
     row.salesperson ? row.displayName : unowned;
@@ -35,6 +44,17 @@ export function TeamCourseLeadMatrix({
     matrix?.rows.filter((row) =>
       [nameFor(row), row.salesperson, ...row.teams].join(" ").toLocaleLowerCase().includes(query),
     ) ?? [];
+  const exportTable = async (format: "csv" | "xlsx") => {
+    if (!matrix || !available || !rows.length || exportState === "working") return;
+    setExportState("working");
+    try {
+      const { downloadTeamCourseExport } = await import("@/lib/team-course-export");
+      await downloadTeamCourseExport({ matrix, rows, filters, lang, search }, format);
+      setExportState("idle");
+    } catch {
+      setExportState("error");
+    }
+  };
   return (
     <section id="team-course-leads" aria-labelledby="team-course-leads-title">
       <Card padded={false} className="overflow-hidden">
@@ -65,6 +85,82 @@ export function TeamCourseLeadMatrix({
                 <b className="num text-xl text-text">{fmtNum(matrix.courses.length)}</b>
               </div>
             </div>
+          )}
+        </div>
+        <div className="border-b border-border bg-surface p-4">
+          <form
+            className="flex flex-wrap items-end gap-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const valid = (date: string) =>
+                /^\d{4}-\d{2}-\d{2}$/.test(date) &&
+                Number.isFinite(Date.parse(date)) &&
+                new Date(date).toISOString().slice(0, 10) === date;
+              if (!valid(dateFrom) || !valid(dateTo) || dateFrom > dateTo) {
+                setDateError(true);
+                return;
+              }
+              setDateError(false);
+              filterStore.setDates(dateFrom, dateTo);
+            }}
+          >
+            <div className="me-1 text-xs text-text-muted">
+              <span className="mb-2 flex items-center gap-1.5 font-semibold text-text">
+                <CalendarDays size={15} aria-hidden="true" />
+                {ar ? "الفترة — مرتبطة بفلتر الصفحة" : "Period — linked to the page filter"}
+              </span>
+              <span dir="ltr">
+                {filters.range === "all"
+                  ? ar
+                    ? "كل الفترات"
+                    : "All time"
+                  : `${filters.from || "…"} → ${filters.to || "…"}`}
+              </span>
+            </div>
+            <label className="grid gap-1 text-xs font-semibold text-text-muted">
+              {ar ? "من تاريخ" : "From date"}
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(event) => {
+                  setDateFrom(event.target.value);
+                  setDateError(false);
+                }}
+                className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+              />
+            </label>
+            <label className="grid gap-1 text-xs font-semibold text-text-muted">
+              {ar ? "إلى تاريخ" : "To date"}
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(event) => {
+                  setDateTo(event.target.value);
+                  setDateError(false);
+                }}
+                className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
+              />
+            </label>
+            <button
+              type="submit"
+              className="min-h-10 rounded-xl bg-brand px-4 text-xs font-bold text-white"
+            >
+              {ar ? "تطبيق الفترة" : "Apply dates"}
+            </button>
+            <button
+              type="button"
+              onClick={() => filterStore.setPreset("all")}
+              className="min-h-10 rounded-xl border border-border px-3 text-xs font-semibold text-text-muted"
+            >
+              {ar ? "كل الفترات" : "All time"}
+            </button>
+          </form>
+          {dateError && (
+            <p role="alert" className="mt-2 text-xs text-red-700">
+              {ar
+                ? "اختار تاريخ بداية ونهاية صحيحين؛ النهاية لا تسبق البداية."
+                : "Choose valid start and end dates; the end cannot precede the start."}
+            </p>
           )}
         </div>
         {!available || !matrix ? (
@@ -100,7 +196,41 @@ export function TeamCourseLeadMatrix({
                   ? "صف · مرّر أفقيًا لباقي الكورسات"
                   : "rows · scroll horizontally for all courses"}
               </span>
+              <div className="flex flex-wrap items-center gap-2">
+                {(["csv", "xlsx"] as const).map((format) => (
+                  <button
+                    key={format}
+                    type="button"
+                    disabled={!rows.length || exportState === "working"}
+                    onClick={() => exportTable(format)}
+                    className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-brand/20 bg-surface px-3 text-xs font-bold text-brand disabled:opacity-40"
+                  >
+                    <Download size={15} aria-hidden="true" />
+                    {format === "csv"
+                      ? ar
+                        ? "تصدير CSV"
+                        : "Export CSV"
+                      : ar
+                        ? "تصدير Excel"
+                        : "Export Excel"}
+                  </button>
+                ))}
+              </div>
             </div>
+            <p className="border-b border-border px-4 py-2 text-xs text-text-muted">
+              {exportState === "working"
+                ? ar
+                  ? "جاري تجهيز الملف…"
+                  : "Preparing export…"
+                : ar
+                  ? "التصدير لنفس الفترة والصفوف الظاهرة بعد البحث؛ الأعداد وليست النِسَب."
+                  : "Exports the same period and visible rows after search; counts, not percentages."}
+            </p>
+            {exportState === "error" && (
+              <p role="alert" className="px-4 py-2 text-xs text-red-700">
+                {ar ? "تعذّر التصدير؛ حاول مرة أخرى." : "Export failed; please try again."}
+              </p>
+            )}
             {!matrix.courses.length ? (
               <p className="p-8 text-center text-sm text-text-muted">
                 {ar ? "لا توجد ليدز ضمن الفلاتر الحالية." : "No leads in the current filter scope."}

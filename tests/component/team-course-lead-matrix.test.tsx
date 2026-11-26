@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { TeamCourseLeadMatrix } from "@/components/TeamCourseLeadMatrix";
 import {
   buildTeamCourseMatrix,
@@ -10,6 +10,8 @@ import {
 } from "@/lib/team-course-leads";
 import { filterStore } from "@/lib/filter-store";
 const query = vi.hoisted(() => vi.fn());
+const exportDownload = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
+vi.mock("@/lib/team-course-export", () => ({ downloadTeamCourseExport: exportDownload }));
 vi.mock("@tanstack/react-query", () => ({ useQuery: query }));
 vi.mock("@/components/DetailPanel", () => ({
   DetailPanel: ({ title, children, footer, onClose }: any) => (
@@ -106,4 +108,53 @@ it("does not show incomplete data as a zero or open a drill-down on failure", ()
   expect(screen.getByRole("status").textContent).toContain("coverage is unavailable");
   expect(screen.queryByRole("table")).toBeNull();
   expect(query).not.toHaveBeenCalled();
+});
+
+it("defaults to the top-bar dates and reflects later changes automatically", () => {
+  render(<TeamCourseLeadMatrix matrix={matrix} available />);
+  expect((screen.getByLabelText("From date") as HTMLInputElement).value).toBe("2026-11-01");
+  expect((screen.getByLabelText("To date") as HTMLInputElement).value).toBe("2026-11-26");
+  act(() => filterStore.setDates("2026-10-01", "2026-10-31"));
+  expect((screen.getByLabelText("From date") as HTMLInputElement).value).toBe("2026-10-01");
+  expect((screen.getByLabelText("To date") as HTMLInputElement).value).toBe("2026-10-31");
+});
+it("applies valid custom dates to the shared filter and closes old drilldowns", () => {
+  render(<TeamCourseLeadMatrix matrix={matrix} available />);
+  fireEvent.click(screen.getByRole("button", { name: "View 57 leads · Sales A · PMP" }));
+  fireEvent.change(screen.getByLabelText("From date"), { target: { value: "2026-11-10" } });
+  fireEvent.change(screen.getByLabelText("To date"), { target: { value: "2026-11-20" } });
+  fireEvent.click(screen.getByRole("button", { name: "Apply dates" }));
+  expect(filterStore.get()).toMatchObject({ from: "2026-11-10", to: "2026-11-20" });
+  expect(screen.queryByRole("dialog")).toBeNull();
+});
+it("rejects reversed/empty dates without changing the active scope", () => {
+  render(<TeamCourseLeadMatrix matrix={matrix} available />);
+  fireEvent.change(screen.getByLabelText("From date"), { target: { value: "2026-12-01" } });
+  fireEvent.click(screen.getByRole("button", { name: "Apply dates" }));
+  expect(screen.getByRole("alert").textContent).toContain("end cannot precede");
+  expect(filterStore.get().from).toBe("2026-11-01");
+  fireEvent.change(screen.getByLabelText("From date"), { target: { value: "" } });
+  fireEvent.click(screen.getByRole("button", { name: "Apply dates" }));
+  expect(filterStore.get().from).toBe("2026-11-01");
+});
+it("exports CSV and Excel for exactly the visible rows and active period", async () => {
+  render(<TeamCourseLeadMatrix matrix={matrix} available />);
+  fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Sales Zero" } });
+  fireEvent.click(screen.getByRole("button", { name: "Export CSV", exact: true }));
+  await waitFor(() => expect(exportDownload).toHaveBeenCalledTimes(1));
+  expect(exportDownload.mock.calls[0][1]).toBe("csv");
+  expect(exportDownload.mock.calls[0][0]).toMatchObject({
+    rows: [expect.objectContaining({ salesperson: "Sales Zero" })],
+    filters: { from: "2026-11-01", to: "2026-11-26" },
+    search: "Sales Zero",
+  });
+  await waitFor(() =>
+    expect(
+      (screen.getByRole("button", { name: "Export Excel", exact: true }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Export Excel", exact: true }));
+  await waitFor(() => expect(exportDownload).toHaveBeenCalledTimes(2));
+  expect(exportDownload.mock.calls[1][1]).toBe("xlsx");
 });
