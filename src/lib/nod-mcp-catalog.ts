@@ -113,6 +113,7 @@ export const NOD_ENDPOINTS: readonly NodEndpoint[] = [
 
   // Teams and management
   { path: "/api/teams", page: "Teams", what: "Sales teams and salespeople: targets, sales, collections, win rates.", filters: true },
+  { path: "/api/team-course-leads", page: "Teams", what: "Paginated Odoo records behind one salesperson/course lead-count matrix cell; current owner, primary course and creation-period filters, not contact counts.", filters: true, params: ["ownerKey", "matrixCourse", "offset", "limit"] },
   { path: "/api/targets", page: "Teams", what: "Monthly targets.", params: ["month"] },
   { path: "/api/management-review", page: "Management review", what: "Review for the global date/filter window; selectedPeriod is authoritative. Full monthly media-plan targets are separate from employee sales targets. Legacy month is used only without explicit dates.", filters: true, params: ["month"] },
   { path: "/api/daily-updates", page: "Daily updates", what: "Daily course KPIs.", params: ["day"], filters: true },

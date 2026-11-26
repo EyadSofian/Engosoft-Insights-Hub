@@ -93,6 +93,7 @@ import { Route as ApiSalesRouteImport } from './routes/api/sales'
 import { Route as ApiSearchRouteImport } from './routes/api/search'
 import { Route as ApiSourceReconciliationRouteImport } from './routes/api/source-reconciliation'
 import { Route as ApiTargetsRouteImport } from './routes/api/targets'
+import { Route as ApiTeamCourseLeadsRouteImport } from './routes/api/team-course-leads'
 import { Route as ApiTeamsRouteImport } from './routes/api/teams'
 import { Route as ApiUncalledLeadsRouteImport } from './routes/api/uncalled-leads'
 import { Route as ApiWebsiteRouteImport } from './routes/api/website'
@@ -573,6 +574,11 @@ const ApiTargetsRoute = ApiTargetsRouteImport.update({
   path: '/api/targets',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTeamCourseLeadsRoute = ApiTeamCourseLeadsRouteImport.update({
+  id: '/api/team-course-leads',
+  path: '/api/team-course-leads',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTeamsRoute = ApiTeamsRouteImport.update({
   id: '/api/teams',
   path: '/api/teams',
@@ -945,6 +951,7 @@ export interface FileRoutesByFullPath {
   '/api/search': typeof ApiSearchRoute
   '/api/source-reconciliation': typeof ApiSourceReconciliationRoute
   '/api/targets': typeof ApiTargetsRoute
+  '/api/team-course-leads': typeof ApiTeamCourseLeadsRoute
   '/api/teams': typeof ApiTeamsRoute
   '/api/uncalled-leads': typeof ApiUncalledLeadsRoute
   '/api/website': typeof ApiWebsiteRoute
@@ -1085,6 +1092,7 @@ export interface FileRoutesByTo {
   '/api/search': typeof ApiSearchRoute
   '/api/source-reconciliation': typeof ApiSourceReconciliationRoute
   '/api/targets': typeof ApiTargetsRoute
+  '/api/team-course-leads': typeof ApiTeamCourseLeadsRoute
   '/api/teams': typeof ApiTeamsRoute
   '/api/uncalled-leads': typeof ApiUncalledLeadsRoute
   '/api/website': typeof ApiWebsiteRoute
@@ -1226,6 +1234,7 @@ export interface FileRoutesById {
   '/api/search': typeof ApiSearchRoute
   '/api/source-reconciliation': typeof ApiSourceReconciliationRoute
   '/api/targets': typeof ApiTargetsRoute
+  '/api/team-course-leads': typeof ApiTeamCourseLeadsRoute
   '/api/teams': typeof ApiTeamsRoute
   '/api/uncalled-leads': typeof ApiUncalledLeadsRoute
   '/api/website': typeof ApiWebsiteRoute
@@ -1368,6 +1377,7 @@ export interface FileRouteTypes {
     | '/api/search'
     | '/api/source-reconciliation'
     | '/api/targets'
+    | '/api/team-course-leads'
     | '/api/teams'
     | '/api/uncalled-leads'
     | '/api/website'
@@ -1508,6 +1518,7 @@ export interface FileRouteTypes {
     | '/api/search'
     | '/api/source-reconciliation'
     | '/api/targets'
+    | '/api/team-course-leads'
     | '/api/teams'
     | '/api/uncalled-leads'
     | '/api/website'
@@ -1648,6 +1659,7 @@ export interface FileRouteTypes {
     | '/api/search'
     | '/api/source-reconciliation'
     | '/api/targets'
+    | '/api/team-course-leads'
     | '/api/teams'
     | '/api/uncalled-leads'
     | '/api/website'
@@ -1789,6 +1801,7 @@ export interface RootRouteChildren {
   ApiSearchRoute: typeof ApiSearchRoute
   ApiSourceReconciliationRoute: typeof ApiSourceReconciliationRoute
   ApiTargetsRoute: typeof ApiTargetsRoute
+  ApiTeamCourseLeadsRoute: typeof ApiTeamCourseLeadsRoute
   ApiTeamsRoute: typeof ApiTeamsRoute
   ApiUncalledLeadsRoute: typeof ApiUncalledLeadsRoute
   ApiWebsiteRoute: typeof ApiWebsiteRoute
@@ -2435,6 +2448,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTargetsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/team-course-leads': {
+      id: '/api/team-course-leads'
+      path: '/api/team-course-leads'
+      fullPath: '/api/team-course-leads'
+      preLoaderRoute: typeof ApiTeamCourseLeadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/teams': {
       id: '/api/teams'
       path: '/api/teams'
@@ -2901,6 +2921,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSearchRoute: ApiSearchRoute,
   ApiSourceReconciliationRoute: ApiSourceReconciliationRoute,
   ApiTargetsRoute: ApiTargetsRoute,
+  ApiTeamCourseLeadsRoute: ApiTeamCourseLeadsRoute,
   ApiTeamsRoute: ApiTeamsRoute,
   ApiUncalledLeadsRoute: ApiUncalledLeadsRoute,
   ApiWebsiteRoute: ApiWebsiteRoute,

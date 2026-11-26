@@ -10,10 +10,14 @@ import { CloseTime, CountPct } from "@/components/metric-bits";
 import { AccountingAgentsView } from "@/components/accounting/AccountingSubViews";
 import type { DataHealth, Maybe, TeamAgg, Totals } from "@/lib/types";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
+import { TeamCourseLeadMatrix } from "@/components/TeamCourseLeadMatrix";
+import type { TeamCourseMatrix } from "@/lib/team-course-leads";
 
 export const Route = createFileRoute("/teams")({ component: Teams });
 
 interface Resp {
+  leadCourseMatrix: TeamCourseMatrix | null;
+  leadCourseMatrixAvailable: boolean;
   teams: TeamAgg[];
   leaderboard: TeamAgg[];
   needsAttention: TeamAgg[];
@@ -193,6 +197,10 @@ function Teams() {
               </table>
             </div>
           </Card>
+          <TeamCourseLeadMatrix
+            matrix={data.leadCourseMatrix}
+            available={data.leadCourseMatrixAvailable}
+          />
         </>
       )}
     </div>

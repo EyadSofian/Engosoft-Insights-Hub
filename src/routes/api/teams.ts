@@ -39,6 +39,16 @@ export const Route = createFileRoute("/api/teams")({
         const directory = await getEmployeeDirectory();
         const people = teams.flatMap((t) => t.people ?? []);
         for (const person of people) person.displayName = directory.displayNameFor(person.name);
+        const { buildTeamCourseMatrix, teamCourseLeadRecords } =
+          await import("@/lib/team-course-leads");
+        const leadCourseMatrixAvailable = data.snapshot.health.lostAuthority !== "unavailable";
+        const leadCourseMatrix = leadCourseMatrixAvailable
+          ? buildTeamCourseMatrix(
+              teamCourseLeadRecords(data.crm, authoritativeLostLeads(data), filters.company),
+              directory.displayNameFor,
+              people.map((person) => ({ name: person.name, team: person.parent })),
+            )
+          : null;
         const MIN_LEADS = 20;
         const leaderboard = [...people]
           .filter((p) => p.crmLeads >= MIN_LEADS)
@@ -81,6 +91,8 @@ export const Route = createFileRoute("/api/teams")({
 
         return json({
           ownershipAudit,
+          leadCourseMatrix,
+          leadCourseMatrixAvailable,
           teams,
           ...agentAnalytics,
           leaderboard,
