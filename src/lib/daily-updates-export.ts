@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
-import { dailyCourseKey } from "./daily-updates";
+import { dailyReportingKey } from "./daily-updates";
+import { dailyCourseLabel, dailyReportCourse } from "./daily-interior-split";
 import type { DailyUpdatesReport } from "./daily-updates.server";
 
 /** A point-in-time export of the loaded page, never a second independent data read. */
@@ -16,7 +17,8 @@ export function createDailyUpdatesWorkbook(
   wb.created = new Date(report.generatedAt);
   wb.calcProperties.fullCalcOnLoad = true;
   const visible = new Set(visibleRows.map((row) => row.key));
-  const inScope = (r: { course: string }) => visible.has(dailyCourseKey(r.course));
+  const inScope = (r: { course: string; reportCourse?: string }) =>
+    visible.has(dailyReportingKey(r));
   const money = "$#,##0.00;($#,##0.00);$0.00";
   const count = "#,##0";
   const pct = "0.0%";
@@ -87,7 +89,7 @@ export function createDailyUpdatesWorkbook(
       t("عدد الحملات", "Campaign count"),
     ],
     visibleRows.map((r) => [
-      r.course,
+      dailyCourseLabel(r.course, ar),
       report.day,
       report.monthFrom,
       r.leadsDay,
@@ -151,7 +153,7 @@ export function createDailyUpdatesWorkbook(
     ],
     visibleRows.flatMap((r) =>
       r.campaigns.map((c) => [
-        r.course,
+        dailyCourseLabel(r.course, ar),
         c.name,
         c.key,
         c.platforms.join(" · "),
@@ -187,7 +189,7 @@ export function createDailyUpdatesWorkbook(
     report.details.leads
       .filter(inScope)
       .map((r) => [
-        r.course,
+        dailyCourseLabel(dailyReportCourse(r), ar),
         r.id,
         r.name,
         r.createdAt,
@@ -220,7 +222,7 @@ export function createDailyUpdatesWorkbook(
       ? report.details.lost
           .filter(inScope)
           .map((r) => [
-            r.course,
+            dailyCourseLabel(dailyReportCourse(r), ar),
             r.id,
             r.name,
             r.date,
@@ -243,7 +245,13 @@ export function createDailyUpdatesWorkbook(
     report.availability.revenue
       ? report.details.invoices
           .filter(inScope)
-          .map((r) => [r.course, r.invoice, r.company, r.date, r.amount])
+          .map((r) => [
+            dailyCourseLabel(dailyReportCourse(r), ar),
+            r.invoice,
+            r.company,
+            r.date,
+            r.amount,
+          ])
       : [],
   );
   collections.getColumn(5).numFmt = money;
@@ -315,6 +323,13 @@ export function createDailyUpdatesWorkbook(
       t(
         "الأعداد والمبالغ لقطة من المصادر وقت القراءة. نسب الكورسات معادلات بمخرجات مخبأة مطابقة للداشبورد؛ تُعاد في Excel عند تعديل المدخلات.",
         "Counts and money are source snapshots as of read time. Course ratios are formulas with dashboard-matching cached values; Excel recalculates when inputs change.",
+      ),
+    ],
+    [
+      t("فصل الديكور", "Interior split"),
+      t(
+        "off / offline ككلمة مستقلة في اسم حملة Interior = أوفلاين؛ باقي حملات Interior = أونلاين. الربط بمعرف الحملة أو اسمها المثبت. التحصيل بلا حملة محاسبية أو ربط Opportunity موثق يظهر غير منسوب، بلا توزيع تقديري أو تكرار.",
+        "Standalone off / offline in an Interior campaign name = Offline; other Interior campaigns = Online. Attribution uses evidenced campaign ID/name. Collections without accounting campaign or exact Opportunity evidence remain Unattributed, without estimated allocation or duplication.",
       ),
     ],
   ];

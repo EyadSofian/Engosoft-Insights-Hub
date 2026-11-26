@@ -14,6 +14,7 @@ import {
 } from "./daily-updates";
 import type { GlobalFilters } from "./types";
 import { odooConfig } from "./odoo.server";
+import { dailyBaseCourse } from "./daily-interior-split";
 
 export const dailyToday = () =>
   new Intl.DateTimeFormat("en-CA", {
@@ -123,6 +124,10 @@ async function buildReport(scope: GlobalFilters, day: string) {
         url: r.odooUrl,
         source: r.source,
         segment: byId.get(r.id)?.["Lead Segment"] || "",
+        campaign: byId.get(r.id)?.["Campaign Name"] || "",
+        campaignKey: byId.get(r.id)?.["Campaign ID"]
+          ? "id:" + byId.get(r.id)!["Campaign ID"]
+          : undefined,
       }));
     } catch {
       lostReady = false;
@@ -164,6 +169,8 @@ async function buildReport(scope: GlobalFilters, day: string) {
       name: r.contact,
       source: r.source,
       segment: r.leadSegment,
+      campaign: r.campaignName,
+      campaignKey: r.campaignKey,
       url: odoo + "/web#id=" + encodeURIComponent(r.id) + "&model=crm.lead&view_type=form",
     }));
     fallbackDateCount = authoritativeLostLeads(closedData).filter(
@@ -180,15 +187,65 @@ async function buildReport(scope: GlobalFilters, day: string) {
     orderLinks.set(row.sale_order_name, ids);
   }
   const ambiguousOrderLinks = [...orderLinks.values()].filter((s) => s.size > 1).length;
-  const payments = data.accounting.map((row) => ({
-    course: row.course,
-    order: row.orderRef,
-    company: row.company,
-    leadId: orderLinks.get(row.orderRef)?.size === 1 ? [...orderLinks.get(row.orderRef)!][0] : "",
-    date: accountingReportingDate(row, "payment"),
-    amount: row.usdPaid,
-    invoice: row.movement,
-  }));
+  // Follow exact order→opportunity links, including older cohorts. Never spread
+  // unlinked collections across Online/Offline in proportion to leads or spend.
+  const linkedCampaigns = new Map<
+    string,
+    { course: string; campaign: string; campaignKey?: string }
+  >();
+  for (const row of [...(data.snapshot.crm || []), ...(data.snapshot.lost || [])])
+    linkedCampaigns.set(row.id, {
+      course: row.course,
+      campaign: row.campaignName,
+      campaignKey: row.campaignKey,
+    });
+  for (const row of entries) linkedCampaigns.set(row.id, row);
+  const missingInteriorIds = [
+    ...new Set(
+      data.accounting.flatMap((row) => {
+        const ids = orderLinks.get(row.orderRef);
+        if (
+          !links.ok ||
+          row.campaignName ||
+          dailyBaseCourse(row.course) !== "Interior" ||
+          ids?.size !== 1
+        )
+          return [];
+        const id = [...ids][0];
+        return linkedCampaigns.get(id)?.campaign || !/^\d+$/.test(id) ? [] : [Number(id)];
+      }),
+    ),
+  ];
+  if (missingInteriorIds.length) {
+    try {
+      const raw = await loadCrmRawByIds(missingInteriorIds, { attempts: 1, timeoutMs: 15000 });
+      for (const row of raw)
+        linkedCampaigns.set(row.__odoo_id, {
+          course: row.Course || "",
+          campaign: row["Campaign Name"] || "",
+          campaignKey: row["Campaign ID"] ? "id:" + row["Campaign ID"] : undefined,
+        });
+    } catch {
+      errors.push("interior_payment_campaign_lookup_unavailable");
+    }
+  }
+  const payments = data.accounting.map((row) => {
+    const leadId =
+      orderLinks.get(row.orderRef)?.size === 1 ? [...orderLinks.get(row.orderRef)!][0] : "";
+    const linked = links.ok ? linkedCampaigns.get(leadId) : undefined;
+    const sameCourse = linked && dailyBaseCourse(linked.course) === dailyBaseCourse(row.course);
+    return {
+      course: row.course,
+      order: row.orderRef,
+      company: row.company,
+      leadId,
+      campaign: row.campaignName || (sameCourse ? linked.campaign : ""),
+      campaignKey: row.campaignKey || (sameCourse ? linked.campaignKey : undefined),
+      date: accountingReportingDate(row, "payment"),
+      amount: row.usdPaid,
+      invoice: row.movement,
+    };
+  });
   const spend = data.ads.map((row) => {
     const attribution = attributedAdCourse(row, data.snapshot);
     return {

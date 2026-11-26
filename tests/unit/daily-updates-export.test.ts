@@ -107,6 +107,67 @@ function report(missing = false): DailyUpdatesReport {
   } as DailyUpdatesReport;
 }
 describe("daily updates Excel export", () => {
+  it("exports only the selected Interior delivery group across every sheet", async () => {
+    const data = report();
+    const split = buildDailyUpdates({
+      day: data.day,
+      availability: data.availability,
+      entries: data.details.leads.map((r, i) => ({
+        ...r,
+        course: "Interior",
+        campaign: i === 0 ? "INTERIOR-4/11/26-sayed-off" : "INTERIOR-3/11/26-sayed",
+      })),
+      losses: data.details.lost.map((r) => ({
+        ...r,
+        course: "Interior",
+        campaign: "INTERIOR-4/11/26-sayed-off",
+      })),
+      payments: [
+        {
+          course: "Interior",
+          campaign: "INTERIOR-4/11/26-sayed-off",
+          company: "KSA",
+          order: "S1",
+          leadId: "1",
+          date: data.day,
+          invoice: "INV-OFF",
+          amount: 100,
+        },
+        {
+          course: "Interior",
+          company: "KSA",
+          order: "S2",
+          leadId: "",
+          date: data.day,
+          invoice: "INV-UNKNOWN",
+          amount: 300,
+        },
+      ],
+      spend: ["INTERIOR-4/11/26-sayed-off", "INTERIOR-3/11/26-sayed"].map((campaign, i) => ({
+        course: "Interior",
+        campaign,
+        campaignKey: `id:${i}`,
+        platform: "meta",
+        date: data.day,
+        spend: 10,
+        attribution: "campaign_name",
+      })),
+    });
+    const full = { ...data, ...split };
+    const visible = full.rows.filter((r) => r.course === "Interior · Offline");
+    const wb = createDailyUpdatesWorkbook(full, visible, "en", "Offline");
+    for (const name of ["Courses", "Campaigns", "CRM records", "Lost records", "Collections"]) {
+      const sheet = wb.getWorksheet(name)!;
+      expect(sheet.rowCount).toBe(2);
+      expect(sheet.getCell("A2").value).toBe("Interior · Offline");
+    }
+    expect(wb.getWorksheet("Collections")!.getCell("B2").value).toBe("INV-OFF");
+    expect(wb.getWorksheet("CRM records")!.getCell("B2").value).toBe("1");
+    const ar = createDailyUpdatesWorkbook(full, visible, "ar");
+    expect(ar.getWorksheet("الكورسات")!.getCell("A2").value).toBe("ديكور · أوفلاين");
+    if (process.env.DAILY_INTERIOR_EXPORT_TEST_OUTPUT)
+      await wb.xlsx.writeFile(process.env.DAILY_INTERIOR_EXPORT_TEST_OUTPUT);
+  });
   it("writes a genuine XLSX with numeric currencies, cached ratio formulas and all detail sheets", async () => {
     const data = report(),
       wb = createDailyUpdatesWorkbook(data);

@@ -80,6 +80,62 @@ afterEach(() => {
   localStorage.clear();
 });
 describe("daily updates presentation", () => {
+  it("keeps Interior Online/Offline visible and drilldowns/export isolated", async () => {
+    const data = fixture();
+    const source = data.details.leads[0];
+    Object.assign(
+      data,
+      buildDailyUpdates({
+        day: "2026-11-11",
+        availability: data.availability,
+        entries: [
+          {
+            ...source,
+            course: "Interior",
+            campaign: "INTERIOR-4/11/26-sayed-off",
+            name: "Offline customer",
+          },
+          {
+            ...source,
+            course: "Interior",
+            id: "2",
+            campaign: "INTERIOR-3/11/26-sayed",
+            name: "Online customer",
+          },
+        ],
+        losses: [],
+        payments: [],
+        spend: [],
+      }),
+    );
+    query.mockReturnValue({ data, isPending: false, isFetching: false, refetch: vi.fn() });
+    render(
+      <I18nProvider>
+        <DailyUpdates />
+      </I18nProvider>,
+    );
+    expect(screen.getByRole("rowheader", { name: "Interior · Online" })).toBeTruthy();
+    const tr = screen.getByRole("rowheader", { name: "Interior · Offline" }).closest("tr")!;
+    fireEvent.click(
+      within(within(tr).getAllByRole("cell")[1]).getAllByRole("button", { name: "1" })[0],
+    );
+    const dialog = within(screen.getByRole("dialog"));
+    expect(dialog.getByRole("link", { name: /Offline customer/ })).toBeTruthy();
+    expect(dialog.queryByRole("link", { name: /Online customer/ })).toBeNull();
+    fireEvent.click(dialog.getByRole("button", { name: "Close" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Search courses" }), {
+      target: { value: "Offline" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Export Excel" }));
+    await waitFor(() =>
+      expect(exportExcel).toHaveBeenCalledWith(
+        data,
+        [expect.objectContaining({ course: "Interior · Offline" })],
+        "en",
+        "Offline",
+      ),
+    );
+  });
   it("exports the loaded day and visible course rows as Excel", async () => {
     render(
       <I18nProvider>

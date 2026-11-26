@@ -13,7 +13,8 @@ import { Card, Notice, Skeleton } from "@/components/ui-bits";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useFilters, filterStore } from "@/lib/filter-store";
 import { fmtNum, fmtPct, fmtRoas, fmtUSDFull, fmtDateTime, useI18n } from "@/lib/i18n";
-import { dailyCourseKey } from "@/lib/daily-updates";
+import { dailyCourseKey, dailyReportingKey } from "@/lib/daily-updates";
+import { dailyBaseCourse, dailyCourseLabel } from "@/lib/daily-interior-split";
 import type { DailyUpdatesReport } from "@/lib/daily-updates.server";
 import { useModalGuard } from "@/lib/ui-store";
 import { useRegisterNexusView } from "@/components/engo-nexus/state/nexus-view-context";
@@ -31,7 +32,7 @@ const todayCairo = () =>
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
-const courseName = (s: string) =>
+const courseName = (s: string, ar = false) =>
   ({
     Auto: "Automotive",
     Interior: "Interior Design",
@@ -40,7 +41,7 @@ const courseName = (s: string) =>
     Arch: "Architecture",
     Infra: "Infrastructure",
     Struc: "Structure",
-  })[s] || s;
+  })[s] || dailyCourseLabel(s, ar);
 
 export function DailyUpdates() {
   const { lang } = useI18n(),
@@ -83,8 +84,9 @@ export function DailyUpdates() {
   const open = (course: string, kind: Detail["kind"], month = false) =>
     setDetail({ course, kind, month });
   const rows =
-    data?.rows.filter((r) => courseName(r.course).toLowerCase().includes(search.toLowerCase())) ||
-    [];
+    data?.rows.filter((r) =>
+      `${courseName(r.course, ar)} ${r.course}`.toLowerCase().includes(search.toLowerCase()),
+    ) || [];
   const exportExcel = async () => {
     if (!data || exporting) return;
     setExporting(true);
@@ -101,7 +103,12 @@ export function DailyUpdates() {
   const scoped = (course: string, month: boolean) => {
     filterStore.setDates(month ? day.slice(0, 7) + "-01" : day, day);
     filterStore.set({
-      course: course === "Unclassified" ? undefined : course === "__all" ? filters.course : course,
+      course:
+        course === "Unclassified"
+          ? undefined
+          : course === "__all"
+            ? filters.course
+            : dailyBaseCourse(course),
       dateBasis: undefined,
     });
   };
@@ -114,8 +121,7 @@ export function DailyUpdates() {
           (r) =>
             (detail.kind !== "won" || ("status" in r && r.status === "won")) &&
             (detail.kind !== "cohortLost" || ("status" in r && r.status === "lost")) &&
-            (detail.course === "__all" ||
-              dailyCourseKey(r.course) === dailyCourseKey(detail.course)) &&
+            (detail.course === "__all" || dailyReportingKey(r) === dailyCourseKey(detail.course)) &&
             (detail.month ||
               ("createdAt" in r ? r.createdAt === day : "date" in r ? r.date === day : false)),
         );
@@ -281,6 +287,13 @@ export function DailyUpdates() {
                     ? "الأرقام اللي تحتها خط تفتح السجلات. اضغط اسم الكورس لعرض حملاته."
                     : "Underlined figures open records. Select the course name for its campaigns."}
                 </p>
+                {data.rows.some((r) => r.baseCourse === "Interior") && (
+                  <p className="mt-2 max-w-3xl text-xs leading-6 text-text-muted">
+                    {ar
+                      ? "الديكور منفصل: أوفلاين للحملات التي تحتوي off / offline، وأونلاين لباقي حملات Interior. السجلات والتحصيل بلا حملة مثبتة تظهر في «غير منسوب»؛ الإجمالي لا يتكرر. نفس الفصل موجود في Excel."
+                      : "Interior is split: standalone off / offline campaigns are Offline; other Interior campaigns are Online. Records and collections without evidenced campaign attribution stay Unattributed. Totals are not duplicated; Excel uses the same split."}
+                  </p>
+                )}
               </div>
               <label className="inline-flex items-center gap-2 rounded-xl border border-border bg-surface-2 px-3">
                 <Search size={15} />
@@ -392,7 +405,7 @@ export function DailyUpdates() {
             <DialogContent className="max-h-[85vh] max-w-4xl overflow-y-auto rounded-2xl bg-surface text-text">
               <DialogTitle>
                 {detail &&
-                  `${detail.course === "__all" ? (ar ? "كل الكورسات" : "All courses") : courseName(detail.course)} · ${title(detail.kind)}`}
+                  `${detail.course === "__all" ? (ar ? "كل الكورسات" : "All courses") : courseName(detail.course, ar)} · ${title(detail.kind)}`}
               </DialogTitle>
               <DialogDescription>
                 {detail?.month ? data.monthFrom : day} → {day} · {fmtNum(detailRows.length)}{" "}
@@ -487,6 +500,15 @@ export function DailyUpdates() {
                     : "In Lost, choose the movement/close-date view. These are currently-Lost records dated in the day, not every Chatter transition."}
                 </p>
               )}
+              {detail &&
+                detail.course !== "Interior" &&
+                dailyBaseCourse(detail.course) === "Interior" && (
+                  <p className="text-xs text-text-muted">
+                    {ar
+                      ? "السجلات هنا تخص هذا النوع فقط. التقرير المرتبط يفتح كورس الديكور كاملًا؛ فصل أونلاين/أوفلاين متاح هنا وفي Excel."
+                      : "Records here belong only to this delivery group. The related report opens the full Interior course; the Online/Offline split is available here and in Excel."}
+                  </p>
+                )}
             </DialogContent>
           </Dialog>
         </>
@@ -545,7 +567,7 @@ function CourseRows({
             onClick={toggle}
             className="inline-flex min-h-9 items-center gap-1 whitespace-nowrap font-black hover:text-brand"
           >
-            {courseName(row.course)}
+            {courseName(row.course, ar)}
             <ChevronDown size={14} className={expanded ? "rotate-180" : ""} />
           </button>
         </th>
@@ -570,7 +592,7 @@ function CourseRows({
           <td colSpan={11} className="border-y border-brand/15 bg-brand-soft/20 p-5">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h3 className="font-bold">
-                {courseName(row.course)} ·{" "}
+                {courseName(row.course, ar)} ·{" "}
                 {ar ? "الحملات المسجلة في الشهر" : "Campaigns observed this month"}
               </h3>
               <Link

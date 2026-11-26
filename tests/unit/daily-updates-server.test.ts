@@ -96,6 +96,91 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 describe("daily server orchestration", () => {
+  it("attributes Interior collections through exact older-opportunity evidence, retaining unknown money", async () => {
+    m.movement.mockResolvedValue({ availability: "unavailable" });
+    const data = await m.filtered();
+    data.accounting = [
+      { ...data.accounting[0], course: "Interior", orderRef: "S-old" },
+      {
+        ...data.accounting[0],
+        course: "Interior",
+        orderRef: "unlinked",
+        movement: "INV2",
+        usdPaid: 200,
+      },
+      {
+        ...data.accounting[0],
+        course: "Interior",
+        orderRef: "own",
+        movement: "INV3",
+        campaignName: "INTERIOR-3/11/26- sayed",
+        usdPaid: 300,
+      },
+    ];
+    data.lost = [
+      {
+        id: "lost",
+        course: "Interior",
+        closeDate: "2026-11-11",
+        recordType: "lead",
+        source: "Facebook",
+        leadSegment: "",
+        contact: "Lost",
+        campaignName: "INTERIOR-4/11/26- sayed-off",
+        lostDateBasis: "date_closed",
+      },
+    ];
+    m.filtered.mockResolvedValue(data);
+    m.raw.mockResolvedValue([]);
+    m.query.mockResolvedValue({
+      rows: [
+        { sale_order_name: "S-old", opportunity_id: "99", refreshed_at: "2026-11-11T09:00:00Z" },
+      ],
+    });
+    m.byIds.mockResolvedValue([
+      {
+        ...row("99"),
+        Course: "Interior",
+        "Campaign Name": "INTERIOR-4/11/26- sayed-off",
+        "Campaign ID": "20",
+      },
+    ]);
+    const { dailyUpdatesReport } = await import("@/lib/daily-updates.server");
+    const result = await dailyUpdatesReport({}, "2026-11-11");
+    expect(m.byIds).toHaveBeenCalledWith([99], { attempts: 1, timeoutMs: 15000 });
+    expect(result.rows.find((r) => r.course === "Interior · Offline")).toMatchObject({
+      revenueDay: 100,
+      lostDay: 1,
+    });
+    expect(result.rows.find((r) => r.course === "Interior · Online")).toMatchObject({
+      revenueDay: 300,
+    });
+    expect(result.rows.find((r) => r.course === "Interior · Unattributed")).toMatchObject({
+      revenueDay: 200,
+    });
+    expect(result.totals.revenueDay).toBe(600);
+  });
+  it("does not infer Interior payment delivery from stale order links", async () => {
+    m.movement.mockResolvedValue({ availability: "unavailable" });
+    const data = await m.filtered();
+    data.accounting[0].course = "Interior";
+    m.filtered.mockResolvedValue(data);
+    m.raw.mockResolvedValue([
+      { ...row("1"), Course: "Interior", "Campaign Name": "INTERIOR-4/11/26-sayed-off" },
+    ]);
+    m.query.mockResolvedValue({
+      rows: [{ sale_order_name: "S1", opportunity_id: "1", refreshed_at: "2026-10-01T09:00:00Z" }],
+    });
+    const { dailyUpdatesReport } = await import("@/lib/daily-updates.server");
+    const result = await dailyUpdatesReport({}, "2026-11-11");
+    expect(result.rows.find((r) => r.course === "Interior · Unattributed")).toMatchObject({
+      revenueDay: 100,
+    });
+    expect(result.rows.find((r) => r.course === "Interior · Offline")).toMatchObject({
+      revenueDay: 0,
+      conversionDay: null,
+    });
+  });
   it("uses the canonical current-Lost date population without claiming access to denied Chatter tracking", async () => {
     m.movement.mockResolvedValue({ availability: "unavailable" });
     const data = await m.filtered();

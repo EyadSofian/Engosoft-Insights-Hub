@@ -1357,7 +1357,7 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
         endpoint: "/api/daily-updates",
         as: "root",
         required: true,
-        why: "Cairo-day live CRM entries and the canonical Lost workspace close-date population, exact paid-order links, existing accounting and course ad attribution. Chatter event evidence is optional and separate.",
+        why: "Cairo-day live CRM entries and the canonical Lost workspace close-date population, exact paid-order links, existing accounting and course ad attribution. Interior is partitioned into Online, Offline and Unattributed rows, not extra courses to add to an Interior parent. Chatter event evidence is optional and separate.",
         summaryPaths: ["day", "monthFrom", "totals", "availability", "errors", "sources"],
       },
     ],
@@ -1397,6 +1397,10 @@ export const SURFACE_CONTRACTS: readonly SurfaceContract[] = [
     ],
     freshnessPaths: ["generatedAt", "sources"],
     caveats: [
+      t(
+        "صفوف الديكور أونلاين وأوفلاين وغير منسوب أجزاء غير متكررة من نفس الكورس. كلمة off / offline المستقلة في اسم الحملة تحدد الأوفلاين. لا تنسب التحصيل غير المنسوب تخمينًا لأي نوع؛ التقرير المرتبط خارج الصفحة يفتح كورس الديكور كاملًا.",
+        "Interior Online, Offline and Unattributed rows partition one course without duplication. A standalone off / offline campaign-name token identifies Offline. Do not assign unattributed collections by assumption; related reports outside this page open the full Interior course.",
+      ),
       t(
         "حركة Lost بتاريخ الإغلاق منفصلة عن حالة مجموعة الدخول. نسبة الإغلاق = Won ÷ (Won + Lost) لنفس المجموعة. CR للتحويل لدفع مثبت، وROAS تحصيل الفترة ÷ صرفها وليس إسنادًا سببيًا. التاريخ مستقل عن فلتر الفترة العلوي.",
         "Lost movement by close date is separate from entry-cohort status. Closure rate is Won ÷ (Won + Lost) in the cohort. CR uses evidenced payment, and ROAS is period revenue ÷ spend, not causal attribution. The day is independent of the header period.",

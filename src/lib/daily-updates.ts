@@ -1,5 +1,12 @@
 import { canonicalCourseValue, normalizeCourseKey } from "./course-taxonomy";
 import { countsAsPotentialLead } from "./lead-count-policy";
+import {
+  classifyDailyCourse,
+  dailyBaseCourse,
+  dailyReportCourse,
+  interiorCampaignLookup,
+  INTERIOR_REPORT_COURSES,
+} from "./daily-interior-split";
 
 export interface DailyEntry {
   id: string;
@@ -13,8 +20,12 @@ export interface DailyEntry {
   url: string;
   campaign: string;
   campaignKey?: string;
+  reportCourse?: string;
 }
 export interface DailyLoss {
+  campaign?: string;
+  campaignKey?: string;
+  reportCourse?: string;
   id: string;
   course: string;
   date: string;
@@ -25,6 +36,9 @@ export interface DailyLoss {
   segment: string;
 }
 export interface DailyPayment {
+  campaign?: string;
+  campaignKey?: string;
+  reportCourse?: string;
   course: string;
   order: string;
   company: string;
@@ -34,6 +48,7 @@ export interface DailyPayment {
   invoice: string;
 }
 export interface DailySpend {
+  reportCourse?: string;
   course: string;
   campaign: string;
   campaignKey: string;
@@ -52,8 +67,14 @@ export interface DailyAvailability {
 }
 const ratio = (a: number, b: number) => (b > 0 ? a / b : null);
 export const dailyCourse = (course: string) =>
-  canonicalCourseValue(course) || course.trim() || "Unclassified";
+  Object.values(INTERIOR_REPORT_COURSES).some(
+    (label) => normalizeCourseKey(label) === normalizeCourseKey(course),
+  )
+    ? course.trim()
+    : canonicalCourseValue(course) || course.trim() || "Unclassified";
 export const dailyCourseKey = (course: string) => normalizeCourseKey(dailyCourse(course));
+export const dailyReportingKey = (row: { course: string; reportCourse?: string }) =>
+  dailyCourseKey(dailyReportCourse(row));
 export function validDailyDate(value: string, today: string): boolean {
   return (
     /^\d{4}-\d{2}-\d{2}$/.test(value) &&
@@ -76,6 +97,7 @@ export function buildDailyUpdates(input: {
 }) {
   const { day, availability } = input;
   const monthFrom = day.slice(0, 7) + "-01";
+  const lookup = interiorCampaignLookup(input.spend);
   const entries = [
     ...new Map(
       input.entries
@@ -86,17 +108,20 @@ export function buildDailyUpdates(input: {
             r.createdAt <= day &&
             countsAsPotentialLead(r.source, r.segment),
         )
-        .map((r) => [r.id, r]),
+        .map((r) => [r.id, classifyDailyCourse(r, lookup)]),
     ).values(),
   ];
   const losses = [
     ...new Map(
       input.losses
         .filter((r) => r.id && r.date === day && countsAsPotentialLead(r.source, r.segment))
-        .map((r) => [r.id, r]),
+        .map((r) => [r.id, classifyDailyCourse(r, lookup)]),
     ).values(),
   ];
-  const payments = input.payments.filter((p) => p.date >= monthFrom && p.date <= day);
+  const payments = input.payments
+    .filter((p) => p.date >= monthFrom && p.date <= day)
+    .map((p) => classifyDailyCourse(p, lookup));
+  const spend = input.spend.map((p) => classifyDailyCourse(p, lookup));
   // Order references are company-scoped; conflicting opportunity links are rejected upstream.
   const netOrders = new Map<string, number>();
   for (const p of payments)
@@ -116,23 +141,26 @@ export function buildDailyUpdates(input: {
     paidCourses.set(p.leadId, courses);
   }
   const courseNames = new Map<string, string>();
-  for (const r of [
-    ...entries,
-    ...losses,
-    ...payments,
-    ...input.spend,
-    ...(input.courses || []).map((course) => ({ course })),
-  ]) {
-    courseNames.set(dailyCourseKey(r.course), dailyCourse(r.course));
+  for (const r of [...entries, ...losses, ...payments, ...spend]) {
+    courseNames.set(dailyReportingKey(r), dailyReportCourse(r));
+  }
+  for (const course of input.courses || []) {
+    if (dailyBaseCourse(course) === "Interior") {
+      for (const mode of ["online", "offline"] as const)
+        courseNames.set(
+          dailyCourseKey(INTERIOR_REPORT_COURSES[mode]),
+          INTERIOR_REPORT_COURSES[mode],
+        );
+    } else courseNames.set(dailyCourseKey(course), dailyCourse(course));
   }
   const summarize = (course?: string) => {
-    const same = (r: { course: string }) =>
-      course === undefined || dailyCourseKey(r.course) === course;
+    const same = (r: { course: string; reportCourse?: string }) =>
+      course === undefined || dailyReportingKey(r) === course;
     const monthEntries = entries.filter(same);
     const dayEntries = monthEntries.filter((r) => r.createdAt === day);
     const dayLosses = losses.filter(same);
     const paid = payments.filter(same);
-    const adRows = input.spend.filter((r) => same(r) && r.date >= monthFrom && r.date <= day);
+    const adRows = spend.filter((r) => same(r) && r.date >= monthFrom && r.date <= day);
     const dayPaid = paid.filter((p) => p.date === day);
     const converted = monthEntries.filter((r) =>
       paidCourses.get(r.id)?.has(dailyCourseKey(r.course)),
@@ -201,8 +229,8 @@ export function buildDailyUpdates(input: {
   };
   const rows = [...courseNames]
     .map(([key, course]) => {
-      const adRows = input.spend.filter(
-        (r) => dailyCourseKey(r.course) === key && r.date >= monthFrom && r.date <= day,
+      const adRows = spend.filter(
+        (r) => dailyReportingKey(r) === key && r.date >= monthFrom && r.date <= day,
       );
       const campaigns = [...new Set(adRows.map((r) => r.campaignKey))]
         .map((campaignKey) => {
@@ -213,7 +241,7 @@ export function buildDailyUpdates(input: {
           );
           const leads = entries.filter(
             (r) =>
-              dailyCourseKey(r.course) === key &&
+              dailyReportingKey(r) === key &&
               (r.campaignKey
                 ? r.campaignKey === campaignKey
                 : matchingNames.size === 1 && r.campaign === name),
@@ -234,7 +262,7 @@ export function buildDailyUpdates(input: {
           (a, b) =>
             (b.spendDay ?? 0) - (a.spendDay ?? 0) || (b.spendMonth ?? 0) - (a.spendMonth ?? 0),
         );
-      return { key, course, ...summarize(key), campaigns };
+      return { key, course, baseCourse: dailyBaseCourse(course), ...summarize(key), campaigns };
     })
     .sort(
       (a, b) =>
