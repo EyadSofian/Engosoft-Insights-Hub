@@ -24,16 +24,12 @@ export function TeamCourseLeadMatrix({
   const filters = useFilters();
   const searchId = useId();
   const [search, setSearch] = useState("");
-  const [dateFrom, setDateFrom] = useState(filters.from || "");
-  const [dateTo, setDateTo] = useState(filters.to || "");
   const [dateError, setDateError] = useState(false);
   const [exportState, setExportState] = useState<"idle" | "working" | "error">("idle");
   const [selected, setSelected] = useState<Selection | null>(null);
   // A drill-down must never outlive the filter scope its number came from.
   useEffect(() => setSelected(null), [filters]);
   useEffect(() => {
-    setDateFrom(filters.from || "");
-    setDateTo(filters.to || "");
     setDateError(false);
   }, [filters.from, filters.to]);
   const unowned = ar ? "بدون مسؤول حالي" : "No current owner";
@@ -89,9 +85,15 @@ export function TeamCourseLeadMatrix({
         </div>
         <div className="border-b border-border bg-surface p-4">
           <form
+            key={`${filters.from || ""}:${filters.to || ""}`}
             className="flex flex-wrap items-end gap-3"
             onSubmit={(event) => {
               event.preventDefault();
+              // Read the submitted controls, including native date-picker/autofill
+              // edits, rather than relying on a possibly stale React draft.
+              const submitted = new FormData(event.currentTarget);
+              const dateFrom = String(submitted.get("from") || "");
+              const dateTo = String(submitted.get("to") || "");
               const valid = (date: string) =>
                 /^\d{4}-\d{2}-\d{2}$/.test(date) &&
                 Number.isFinite(Date.parse(date)) &&
@@ -121,11 +123,9 @@ export function TeamCourseLeadMatrix({
               {ar ? "من تاريخ" : "From date"}
               <input
                 type="date"
-                value={dateFrom}
-                onChange={(event) => {
-                  setDateFrom(event.target.value);
-                  setDateError(false);
-                }}
+                name="from"
+                defaultValue={filters.from || ""}
+                onInput={() => setDateError(false)}
                 className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
               />
             </label>
@@ -133,11 +133,9 @@ export function TeamCourseLeadMatrix({
               {ar ? "إلى تاريخ" : "To date"}
               <input
                 type="date"
-                value={dateTo}
-                onChange={(event) => {
-                  setDateTo(event.target.value);
-                  setDateError(false);
-                }}
+                name="to"
+                defaultValue={filters.to || ""}
+                onInput={() => setDateError(false)}
                 className="h-10 rounded-xl border border-border bg-surface px-3 text-sm text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand"
               />
             </label>

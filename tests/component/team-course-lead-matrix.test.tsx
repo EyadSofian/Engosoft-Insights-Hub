@@ -137,6 +137,14 @@ it("rejects reversed/empty dates without changing the active scope", () => {
   fireEvent.click(screen.getByRole("button", { name: "Apply dates" }));
   expect(filterStore.get().from).toBe("2026-11-01");
 });
+it("submits native date-control values even when browser autofill emitted no React change event", () => {
+  render(<TeamCourseLeadMatrix matrix={matrix} available />);
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+  setValue.call(screen.getByLabelText("From date"), "2026-11-10");
+  setValue.call(screen.getByLabelText("To date"), "2026-11-20");
+  fireEvent.click(screen.getByRole("button", { name: "Apply dates" }));
+  expect(filterStore.get()).toMatchObject({ from: "2026-11-10", to: "2026-11-20" });
+});
 it("exports CSV and Excel for exactly the visible rows and active period", async () => {
   render(<TeamCourseLeadMatrix matrix={matrix} available />);
   fireEvent.change(screen.getByRole("searchbox"), { target: { value: "Sales Zero" } });
