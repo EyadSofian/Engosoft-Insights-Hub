@@ -1,5 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-const mocks = vi.hoisted(() => ({ query: vi.fn(), release: vi.fn(), connect: vi.fn() }));
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+const mocks = vi.hoisted(() => ({
+  query: vi.fn(),
+  release: vi.fn(),
+  connect: vi.fn(),
+  direct: vi.fn(),
+}));
+vi.mock("@/lib/yeastar-employee-calls.server", () => ({ readVerifiedEmployeeCalls: mocks.direct }));
 vi.mock("@/lib/database-pool.server", () => ({
   getSharedDatabasePool: () => ({ connect: mocks.connect }),
 }));
@@ -9,7 +15,50 @@ beforeEach(() => {
   vi.resetAllMocks();
   mocks.connect.mockResolvedValue({ query: mocks.query, release: mocks.release });
 });
+afterEach(() => vi.unstubAllEnvs());
 describe("direct call store reliability", () => {
+  it("replaces incomplete stored employee totals rather than adding duplicate calls", async () => {
+    vi.stubEnv("YEASTAR_BASE_URL", "https://example.test");
+    vi.stubEnv("YEASTAR_CLIENT_ID", "test");
+    vi.stubEnv("YEASTAR_CLIENT_SECRET", "test");
+    const direct = {
+      key: "3005",
+      name: "Ahmed Salah",
+      extension: "3005",
+      totalCalls: 10,
+      answeredCalls: 5,
+      periodTalkSeconds: 600,
+      periodCallSeconds: 800,
+      averageCallSeconds: 80,
+      analyzedCalls: 0,
+      averageScore: null,
+      needsReview: 0,
+    };
+    mocks.direct.mockResolvedValue({
+      employees: [direct],
+      leadCalls: [],
+      fetchedAt: new Date().toISOString(),
+    });
+    mocks.query.mockImplementation(async (sql: string) => ({
+      rows: sql.includes("dashboard_sync_state")
+        ? [{ dataset: "sla_calls", status: "success", synced_at: new Date() }]
+        : sql.includes("AS call_id")
+          ? [
+              {
+                call_id: "one",
+                extension: "3005",
+                user_name: "Ahmed Salah",
+                started_at: "2026-11-11T09:00:00Z",
+                direction: "outbound",
+                talk_sec: "120",
+              },
+            ]
+          : [],
+    }));
+    const result = await readYeastarCallSummary("2026-11-01", "2026-11-28");
+    expect(result.employees).toEqual([direct]);
+    expect(mocks.direct).toHaveBeenCalledWith("2026-11-01", "2026-11-28");
+  });
   it("does not depend on the analysis host or perform a network request", async () => {
     const fetch = vi.spyOn(globalThis, "fetch");
     mocks.query.mockImplementation(async (sql: string) => ({

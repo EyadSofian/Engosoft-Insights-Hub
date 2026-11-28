@@ -6,6 +6,14 @@ export async function readYeastarCallSummary(from: string, to: string): Promise<
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to)
     throw new Error("A valid call reporting date range is required");
   const pool = getSharedDatabasePool();
+  // The legacy extension-filtered ingest omits recently added Nesting staff.
+  // Read their complete period directly; replace (never add to) stored totals.
+  const direct =
+    process.env.YEASTAR_BASE_URL &&
+    process.env.YEASTAR_CLIENT_ID &&
+    process.env.YEASTAR_CLIENT_SECRET
+      ? await (await import("./yeastar-employee-calls.server")).readVerifiedEmployeeCalls(from, to)
+      : null;
   // Read facts and heartbeat from one consistent snapshot, not a healthy
   // heartbeat followed by a different partially replaced dataset.
   const client = await pool.connect();
@@ -37,18 +45,25 @@ export async function readYeastarCallSummary(from: string, to: string): Promise<
       "SELECT row_data FROM dashboard_rows WHERE dataset = 'pbx_extensions'",
     );
     await client.query("COMMIT");
+    const employees = summarizeYeastarCalls(
+      calls.rows,
+      extensions.rows.map((row) => row.row_data),
+      from,
+      to,
+    );
+    const directExtensions = new Set(direct?.employees.map((row) => row.extension));
     return {
       ok: true,
-      source: "Yeastar CDR · Railway PostgreSQL (direct)",
+      source: direct
+        ? "Yeastar CDR · Railway PostgreSQL + direct PBX"
+        : "Yeastar CDR · Railway PostgreSQL (direct)",
       fetchedAt: new Date(sync.synced_at).toISOString(),
       range: { from, to },
       recordsAvailable: false,
-      employees: summarizeYeastarCalls(
-        calls.rows,
-        extensions.rows.map((row) => row.row_data),
-        from,
-        to,
-      ),
+      employees: [
+        ...employees.filter((row) => !directExtensions.has(row.extension)),
+        ...(direct?.employees || []),
+      ],
     };
   } catch (error) {
     await client.query("ROLLBACK");

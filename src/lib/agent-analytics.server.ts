@@ -44,6 +44,7 @@ import { classifyLostRow } from "./lost-classification";
 import { indexCallsByPhone, resolveLeadContactEvidence } from "./lead-contact-evidence";
 import { summarizeLeadQa, type LeadQaSummary } from "./lead-qa";
 import { countsAsPotentialLead } from "./lead-count-policy";
+import { yeastarEmployeeCandidateKeys } from "./yeastar-employee-identity";
 
 export type { AgentPerformanceScore } from "./employee-performance-score";
 
@@ -1106,7 +1107,11 @@ function mergeCallsHubEmployees(
   for (const source of employees) {
     const exactKey = normalizePersonName(source.name);
     if (!exactKey) continue;
-    const exact = map.get(exactKey);
+    const verifiedKey = yeastarEmployeeCandidateKeys(source.extension, source.name).find((key) =>
+      map.has(key),
+    );
+    const matchedKey = verifiedKey || exactKey;
+    const exact = map.get(matchedKey);
     const candidates = exact
       ? []
       : [...map.entries()]
@@ -1122,7 +1127,7 @@ function mergeCallsHubEmployees(
     // two Odoo people could match, retaining a separate PBX row is safer than
     // crediting calls to the wrong person.
     const matched = exact
-      ? ([exactKey, exact] as const)
+      ? ([matchedKey, exact] as const)
       : best.length === 1
         ? ([best[0].candidateKey, best[0].candidate] as const)
         : null;

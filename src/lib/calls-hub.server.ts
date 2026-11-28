@@ -254,6 +254,19 @@ export async function getCallsHubLeadCalls(
   if (running) return running;
 
   const request = (async () => {
+    const withVerifiedEmployees = async (rows: CallsHubLeadCallAggregate[]) => {
+      if (
+        !process.env.YEASTAR_BASE_URL ||
+        !process.env.YEASTAR_CLIENT_ID ||
+        !process.env.YEASTAR_CLIENT_SECRET
+      )
+        return rows;
+      const direct = await (
+        await import("./yeastar-employee-calls.server")
+      ).readVerifiedEmployeeCalls(from, to);
+      const extensions = new Set(direct.employees.map((row) => row.extension));
+      return [...rows.filter((row) => !extensions.has(row.agentExtension)), ...direct.leadCalls];
+    };
     const url = new URL("/api/integrations/insights/lead-calls", `${baseUrl()}/`);
     url.searchParams.set("from", from);
     url.searchParams.set("to", to);
@@ -261,30 +274,32 @@ export async function getCallsHubLeadCalls(
     try {
       body = (await fetchJson(url)) as Record<string, unknown>;
     } catch {
-      const value = await readStoredLeadCalls(from, to);
+      const value = await withVerifiedEmployees(await readStoredLeadCalls(from, to));
       leadCallsCache.set(cacheKey, { expiresAt: Date.now() + SUMMARY_TTL_MS, value });
       return value;
     }
     const rows = Array.isArray(body.rows) ? body.rows : [];
-    const value = rows.flatMap((item) => {
-      if (!item || typeof item !== "object") return [];
-      const row = item as Record<string, unknown>;
-      const phone = safeText(row.phone);
-      if (!phone) return [];
-      return [
-        {
-          phone,
-          agentName: safeText(row.agentName),
-          agentExtension: safeText(row.agentExtension),
-          callDate: safeText(row.callDate),
-          totalCalls: safeNumber(row.totalCalls),
-          answeredCalls: safeNumber(row.answeredCalls),
-          firstCallAt: safeText(row.firstCallAt),
-          latestCallAt: safeText(row.latestCallAt),
-          latestCallId: safeText(row.latestCallId),
-        },
-      ];
-    });
+    const value = await withVerifiedEmployees(
+      rows.flatMap((item) => {
+        if (!item || typeof item !== "object") return [];
+        const row = item as Record<string, unknown>;
+        const phone = safeText(row.phone);
+        if (!phone) return [];
+        return [
+          {
+            phone,
+            agentName: safeText(row.agentName),
+            agentExtension: safeText(row.agentExtension),
+            callDate: safeText(row.callDate),
+            totalCalls: safeNumber(row.totalCalls),
+            answeredCalls: safeNumber(row.answeredCalls),
+            firstCallAt: safeText(row.firstCallAt),
+            latestCallAt: safeText(row.latestCallAt),
+            latestCallId: safeText(row.latestCallId),
+          },
+        ];
+      }),
+    );
     leadCallsCache.set(cacheKey, { expiresAt: Date.now() + SUMMARY_TTL_MS, value });
     return value;
   })().finally(() => leadCallsInFlight.delete(cacheKey));

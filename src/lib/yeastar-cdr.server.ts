@@ -44,7 +44,7 @@ const baseUrl = () => process.env.YEASTAR_BASE_URL?.replace(/\/+$/, "") ?? "";
 const configured = () =>
   Boolean(baseUrl() && process.env.YEASTAR_CLIENT_ID && process.env.YEASTAR_CLIENT_SECRET);
 
-function cairoDayBounds(day: string): { start: number; end: number } {
+export function cairoDayBounds(day: string): { start: number; end: number } {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error("Invalid CDR day");
   const startOf = (date: string) => {
     const midnight = Date.parse(`${date}T00:00:00Z`);
@@ -94,7 +94,7 @@ async function ensureSchema(): Promise<void> {
   await schemaReady;
 }
 
-async function accessToken(): Promise<string> {
+export async function accessToken(): Promise<string> {
   if (!configured()) throw new Error("Yeastar API is not configured");
   if (token && token.expiresAt > Date.now() + 60_000) return token.value;
   const response = await fetch(`${baseUrl()}/openapi/v1.0/get_token`, {
