@@ -38,6 +38,7 @@ type DayCall = {
 };
 
 let token: { value: string; expiresAt: number } | null = null;
+let tokenPending: Promise<string> | null = null;
 let schemaReady: Promise<void> | null = null;
 
 const baseUrl = () => process.env.YEASTAR_BASE_URL?.replace(/\/+$/, "") ?? "";
@@ -97,6 +98,14 @@ async function ensureSchema(): Promise<void> {
 export async function accessToken(): Promise<string> {
   if (!configured()) throw new Error("Yeastar API is not configured");
   if (token && token.expiresAt > Date.now() + 60_000) return token.value;
+  if (tokenPending) return tokenPending;
+  tokenPending = requestAccessToken().finally(() => {
+    tokenPending = null;
+  });
+  return tokenPending;
+}
+
+async function requestAccessToken(): Promise<string> {
   const response = await fetch(`${baseUrl()}/openapi/v1.0/get_token`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "User-Agent": "Engosoft-Insights-Hub" },

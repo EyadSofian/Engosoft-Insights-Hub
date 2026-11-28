@@ -22,6 +22,8 @@ export function summarizeYeastarCalls(calls: Row[], extensions: Row[], from: str
         extension,
         name: name || `Extension ${extension}`,
         totalCalls: 0,
+        outboundCalls: 0,
+        inboundCalls: 0,
         answeredCalls: 0,
         analyzedCalls: 0,
         averageScore: null,
@@ -40,10 +42,18 @@ export function summarizeYeastarCalls(calls: Row[], extensions: Row[], from: str
   }
   const distinct = new Map<
     string,
-    { extension: string; name: string; talk: number; duration: number; answered: boolean }
+    {
+      extension: string;
+      name: string;
+      direction: string;
+      talk: number;
+      duration: number;
+      answered: boolean;
+    }
   >();
   for (const row of calls) {
-    if (!["outbound", "inbound"].includes(text(row.direction).toLowerCase())) continue;
+    const direction = text(row.direction).toLowerCase();
+    if (!["outbound", "inbound"].includes(direction)) continue;
     const extension = text(row.extension);
     const id = text(row.call_id);
     const rawDate = text(row.started_at);
@@ -64,6 +74,7 @@ export function summarizeYeastarCalls(calls: Row[], extensions: Row[], from: str
     distinct.set(key, {
       extension,
       name: text(row.user_name),
+      direction: existing?.direction ?? direction,
       talk: Math.max(talk, existing?.talk ?? 0),
       duration: Math.max(duration, existing?.duration ?? 0),
       answered: answered || Boolean(existing?.answered),
@@ -72,6 +83,8 @@ export function summarizeYeastarCalls(calls: Row[], extensions: Row[], from: str
   for (const call of distinct.values()) {
     const employee = add(call.extension, call.name);
     employee.totalCalls++;
+    if (call.direction === "outbound") employee.outboundCalls++;
+    else employee.inboundCalls++;
     employee.answeredCalls += Number(call.answered);
     employee.periodTalkSeconds += call.talk;
     employee.periodCallSeconds += call.duration;

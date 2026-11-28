@@ -98,6 +98,7 @@ export interface AgentAnalyticsRow {
   /** All inbound and outbound calls in the selected date window. */
   totalCalls: number | null;
   outboundCalls: number | null;
+  inboundCalls: number | null;
   answeredCalls: number | null;
   answerRate: number | null;
   contactRate: number | null;
@@ -355,7 +356,9 @@ export interface AgentAnalyticsResult {
     leadQaNeedsReview: number | null;
     leadQaDisputed: number | null;
     decidedConversionRate: number | null;
+    totalCalls: number | null;
     outboundCalls: number | null;
+    inboundCalls: number | null;
     answeredCalls: number | null;
     answerRate: number | null;
     totalCallSeconds: number | null;
@@ -614,11 +617,12 @@ const blank = (key: string, name: string): MutableAgent => ({
   leadOwnerCallCoverageRate: null,
   callExtension: null,
   totalCalls: null,
-  outboundCalls: 0,
-  answeredCalls: 0,
+  outboundCalls: null,
+  inboundCalls: null,
+  answeredCalls: null,
   answerRate: null,
   contactRate: null,
-  talkSeconds: 0,
+  talkSeconds: null,
   totalCallSeconds: null,
   averageCallSeconds: null,
   analyzedCalls: null,
@@ -1082,9 +1086,6 @@ function mergeSlaRep(map: Map<string, MutableAgent>, rows: SlaRepMonthly[]) {
     row.newLeads += num(source.new_leads);
     row.contactedLeads += num(source.contacted_leads);
     row.uncontactedLeads += num(source.uncontacted_leads);
-    row.outboundCalls = (row.outboundCalls ?? 0) + num(source.outbound_calls);
-    row.answeredCalls = (row.answeredCalls ?? 0) + num(source.answered_calls);
-    row.talkSeconds = (row.talkSeconds ?? 0) + num(source.talk_sec);
     row.slaWon += num(source.won_leads);
     row.slaLost += num(source.lost_leads);
     if (source.avg_first_call_minutes !== null && num(source.contacted_leads) > 0) {
@@ -1123,21 +1124,21 @@ function mergeCallsHubEmployees(
           .filter((candidate) => candidate.score > 0);
     const bestScore = Math.max(0, ...candidates.map((candidate) => candidate.score));
     const best = candidates.filter((candidate) => candidate.score === bestScore);
-    // A short PBX name is attached only when it points to one employee. When
-    // two Odoo people could match, retaining a separate PBX row is safer than
-    // crediting calls to the wrong person.
+    // A short PBX name is attached only when it points to one employee.
     const matched = exact
       ? ([matchedKey, exact] as const)
       : best.length === 1
         ? ([best[0].candidateKey, best[0].candidate] as const)
         : null;
-    const key = matched?.[0] ?? exactKey;
-    const row = matched?.[1] ?? blank(key, source.name);
+    // The PBX directory also contains operations, shared lines and service
+    // extensions. Do not invent sales employees or count their work here.
+    if (!matched) continue;
+    const [key, row] = matched;
     const alreadyMatched = row.callsHubMatched;
     row.callExtension ||= source.extension;
     row.totalCalls = (alreadyMatched ? (row.totalCalls ?? 0) : 0) + source.totalCalls;
-    // Kept for response compatibility; the UI labels this as all PBX calls.
-    row.outboundCalls = row.totalCalls;
+    row.outboundCalls = (alreadyMatched ? (row.outboundCalls ?? 0) : 0) + source.outboundCalls;
+    row.inboundCalls = (alreadyMatched ? (row.inboundCalls ?? 0) : 0) + source.inboundCalls;
     row.answeredCalls = (alreadyMatched ? (row.answeredCalls ?? 0) : 0) + source.answeredCalls;
     row.totalCallSeconds =
       (alreadyMatched ? (row.totalCallSeconds ?? 0) : 0) + source.periodCallSeconds;
@@ -1736,10 +1737,14 @@ export async function buildAgentAnalytics(
     const callsSnapshot = await callsSnapshotPromise;
     mergeCallsHubEmployees(map, callsSnapshot.employees);
     let leadCoverageAvailable = false;
-    const leadCalls = await leadCallsPromise;
-    if (leadCalls) {
-      await mergeLeadCallCoverage(map, data, leadCalls, integrationFrom, integrationTo);
-      leadCoverageAvailable = true;
+    try {
+      const leadCalls = await leadCallsPromise;
+      if (leadCalls) {
+        await mergeLeadCallCoverage(map, data, leadCalls, integrationFrom, integrationTo);
+        leadCoverageAvailable = true;
+      }
+    } catch {
+      // CRM phone-match evidence must not suppress verified PBX totals.
     }
     const totalCalls = callsSnapshot.employees.reduce((sum, row) => sum + row.totalCalls, 0);
     const analyzedCalls = callsSnapshot.employees.reduce((sum, row) => sum + row.analyzedCalls, 0);
@@ -1826,12 +1831,6 @@ export async function buildAgentAnalytics(
     return true;
   });
   if (slaStatus.ok) {
-    if (!callsHubStatus.ok) {
-      slaStatus.callsAvailable = selectedAgents.some(
-        (row) =>
-          num(row.outboundCalls) > 0 || num(row.answeredCalls) > 0 || num(row.talkSeconds) > 0,
-      );
-    }
     // Row count, not value. Testing for a non-zero total was the only signal
     // available while the report had no feed, but it reads a real reported zero
     // as "no data" — which now matters, because a zero month is a fact about
@@ -1847,9 +1846,7 @@ export async function buildAgentAnalytics(
       row.conversionRate = row.cleanLeads > 0 ? (row.won / row.cleanLeads) * 100 : null;
       row.lostRate = row.cleanLeads > 0 ? (row.lost / row.cleanLeads) * 100 : null;
       row.answerRate =
-        (row.outboundCalls ?? 0) > 0
-          ? ((row.answeredCalls ?? 0) / (row.outboundCalls ?? 1)) * 100
-          : null;
+        (row.totalCalls ?? 0) > 0 ? ((row.answeredCalls ?? 0) / (row.totalCalls ?? 1)) * 100 : null;
       row.contactRate = row.newLeads > 0 ? (row.contactedLeads / row.newLeads) * 100 : null;
       row.decidedConversionRate =
         row.slaWon + row.slaLost > 0 ? (row.slaWon / (row.slaWon + row.slaLost)) * 100 : null;
@@ -1865,6 +1862,7 @@ export async function buildAgentAnalytics(
         row.callExtension = null;
         row.totalCalls = null;
         row.outboundCalls = null;
+        row.inboundCalls = null;
         row.answeredCalls = null;
         row.talkSeconds = null;
         row.totalCallSeconds = null;
@@ -1875,6 +1873,7 @@ export async function buildAgentAnalytics(
       } else if (!slaStatus.callsAvailable) {
         row.totalCalls = null;
         row.outboundCalls = null;
+        row.inboundCalls = null;
         row.answeredCalls = null;
         row.talkSeconds = null;
       }
@@ -1901,7 +1900,7 @@ export async function buildAgentAnalytics(
         row.contactedLeads > 0 ||
         row.slaWon > 0 ||
         row.slaLost > 0 ||
-        (row.outboundCalls ?? 0) > 0 ||
+        (row.totalCalls ?? 0) > 0 ||
         (row.answeredCalls ?? 0) > 0 ||
         (row.analyzedCalls ?? 0) > 0 ||
         (row.chatConversations ?? 0) > 0 ||
@@ -1962,8 +1961,10 @@ export async function buildAgentAnalytics(
         acc.leadQaNeedsReview = (acc.leadQaNeedsReview ?? 0) + row.leadQa.needsReview;
         acc.leadQaDisputed = (acc.leadQaDisputed ?? 0) + row.leadQa.disputed;
       }
+      if (row.totalCalls !== null) acc.totalCalls = (acc.totalCalls ?? 0) + row.totalCalls;
       if (row.outboundCalls !== null)
         acc.outboundCalls = (acc.outboundCalls ?? 0) + row.outboundCalls;
+      if (row.inboundCalls !== null) acc.inboundCalls = (acc.inboundCalls ?? 0) + row.inboundCalls;
       if (row.answeredCalls !== null)
         acc.answeredCalls = (acc.answeredCalls ?? 0) + row.answeredCalls;
       if (row.totalCallSeconds !== null)
@@ -2026,8 +2027,10 @@ export async function buildAgentAnalytics(
       leadQaDisputed: leadQaByOwner ? 0 : (null as number | null),
       conversionRate: null as number | null,
       decidedConversionRate: null as number | null,
-      outboundCalls: slaStatus.callsAvailable ? 0 : (null as number | null),
-      answeredCalls: slaStatus.callsAvailable ? 0 : (null as number | null),
+      totalCalls: null as number | null,
+      outboundCalls: null as number | null,
+      inboundCalls: null as number | null,
+      answeredCalls: null as number | null,
       answerRate: null as number | null,
       totalCallSeconds: slaStatus.callsAvailable ? 0 : (null as number | null),
       talkSeconds: slaStatus.callsAvailable ? 0 : (null as number | null),
@@ -2070,8 +2073,8 @@ export async function buildAgentAnalytics(
       ? (summary.periodClosedWon / (summary.periodClosedWon + summary.periodClosedLost)) * 100
       : null;
   summary.answerRate =
-    (summary.outboundCalls ?? 0) > 0
-      ? ((summary.answeredCalls ?? 0) / (summary.outboundCalls ?? 1)) * 100
+    (summary.totalCalls ?? 0) > 0
+      ? ((summary.answeredCalls ?? 0) / (summary.totalCalls ?? 1)) * 100
       : null;
   const scoredEmployees = agents.filter(
     (row) => row.averageQualityScore !== null && (row.analyzedCalls ?? 0) > 0,

@@ -7,6 +7,8 @@ export interface CallsHubEmployeeSummary {
   name: string;
   extension: string;
   totalCalls: number;
+  outboundCalls: number;
+  inboundCalls: number;
   answeredCalls: number;
   analyzedCalls: number;
   averageScore: number | null;
@@ -188,6 +190,8 @@ function employeeSummary(value: unknown): CallsHubEmployeeSummary | null {
     name,
     extension,
     totalCalls: safeNumber(row.totalCalls),
+    outboundCalls: safeNumber(row.outboundCalls),
+    inboundCalls: safeNumber(row.inboundCalls),
     answeredCalls: safeNumber(row.answeredCalls),
     analyzedCalls: safeNumber(row.analyzedCalls),
     averageScore: optionalNumber(row.averageScore),
@@ -236,6 +240,7 @@ export async function getCallsHubSummary(from: string, to: string): Promise<Call
   const request = (async () => {
     const { readYeastarCallSummary } = await import("./yeastar-call-summary.server");
     const result = await readYeastarCallSummary(from, to);
+    if (summaryCache.size >= 32) summaryCache.delete(summaryCache.keys().next().value!);
     summaryCache.set(cacheKey, { expiresAt: Date.now() + SUMMARY_TTL_MS, value: result });
     return result;
   })().finally(() => summaryInFlight.delete(cacheKey));

@@ -855,21 +855,31 @@ function agentBoardMetrics(data: AgentsResponse, lang: Lang): Record<string, Met
     calls: {
       id: "teams.calls",
       title: A ? "المكالمات" : "Total calls",
-      value: S.outboundCalls === null ? "—" : fmtNum(S.outboundCalls),
+      value: S.totalCalls == null ? "—" : fmtNum(S.totalCalls),
       tone: "cyan",
       icon: <PhoneCall size={16} />,
       definition: A
-        ? "المكالمات الصادرة من مقاسم Yeastar داخل الفترة، منسوبة إلى الموظف صاحب التحويلة."
-        : "Outbound calls from the Yeastar extensions inside the period, attributed to the extension's owner.",
+        ? "مكالمات Yeastar الواردة والصادرة للموظفين المرتبطين بامتداد، داخل الفترة وبدون المكالمات الداخلية."
+        : "Inbound and outbound Yeastar calls for matched employee extensions in the period, excluding internal calls.",
       formula:
         S.answeredCalls === null
           ? A
             ? "لا توجد بيانات مكالمات لهذه الفترة."
             : "No call data for this window."
           : A
-            ? `${fmtNum(S.answeredCalls)} مردود عليها من ${fmtNum(S.outboundCalls ?? 0)} = ${fmtPct(S.answerRate, 1)}.`
-            : `${fmtNum(S.answeredCalls)} answered of ${fmtNum(S.outboundCalls ?? 0)} = ${fmtPct(S.answerRate, 1)}.`,
+            ? `${fmtNum(S.answeredCalls)} مردود عليها من ${fmtNum(S.totalCalls ?? 0)} = ${fmtPct(S.answerRate, 1)}.`
+            : `${fmtNum(S.answeredCalls)} answered of ${fmtNum(S.totalCalls ?? 0)} = ${fmtPct(S.answerRate, 1)}.`,
       supporting: [
+        {
+          key: "outbound",
+          label: A ? "صادرة" : "Outbound",
+          value: S.outboundCalls == null ? "—" : fmtNum(S.outboundCalls),
+        },
+        {
+          key: "inbound",
+          label: A ? "واردة" : "Inbound",
+          value: S.inboundCalls == null ? "—" : fmtNum(S.inboundCalls),
+        },
         {
           key: "answered",
           label: A ? "مردود عليها" : "Answered",
@@ -891,7 +901,7 @@ function agentBoardMetrics(data: AgentsResponse, lang: Lang): Record<string, Met
         {
           id: "employees",
           title: A ? "حسب الموظف" : "By employee",
-          rows: roster((agent) => agent.outboundCalls ?? 0, fmtNum, "cyan"),
+          rows: roster((agent) => agent.totalCalls ?? 0, fmtNum, "cyan"),
           emptyLabel: A ? "لا توجد مكالمات في الفترة" : "No calls in this period",
         },
       ],
@@ -917,7 +927,7 @@ function agentBoardMetrics(data: AgentsResponse, lang: Lang): Record<string, Met
         {
           key: "calls",
           label: A ? "عدد المكالمات" : "Calls",
-          value: S.outboundCalls === null ? "—" : fmtNum(S.outboundCalls),
+          value: S.totalCalls == null ? "—" : fmtNum(S.totalCalls),
         },
         {
           key: "answered",
@@ -970,7 +980,7 @@ function agentBoardMetrics(data: AgentsResponse, lang: Lang): Record<string, Met
         {
           key: "calls",
           label: A ? "إجمالي المكالمات" : "Total calls",
-          value: S.outboundCalls === null ? "—" : fmtNum(S.outboundCalls),
+          value: S.totalCalls == null ? "—" : fmtNum(S.totalCalls),
         },
         { key: "rate", label: A ? "نسبة الرد" : "Answer rate", value: fmtPct(S.answerRate, 1) },
       ],
@@ -1103,7 +1113,7 @@ export function AccountingAgentsView() {
             b.olderCohortClosedLostInPeriod - a.olderCohortClosedLostInPeriod ||
             a.displayName.localeCompare(b.displayName)
           : sortBy === "calls"
-            ? (b.outboundCalls ?? -1) - (a.outboundCalls ?? -1) ||
+            ? (b.totalCalls ?? -1) - (a.totalCalls ?? -1) ||
               (b.answeredCalls ?? -1) - (a.answeredCalls ?? -1)
             : b.paidRevenue - a.paidRevenue || b.invoices - a.invoices,
     );
@@ -1162,7 +1172,7 @@ export function AccountingAgentsView() {
               : "Accounting and CRM metrics remain available.")}
         </Notice>
       )}
-      {data.callsHub.ok && data.summary.outboundCalls === 0 && (
+      {data.callsHub.ok && data.summary.totalCalls === 0 && (
         <Notice
           tone="warning"
           title={
@@ -1652,6 +1662,7 @@ export function AccountingAgentsView() {
 
       <AgentPerformanceSheet
         row={selectedAgent}
+        callsReady={data.callsHub.ok}
         open={selectedAgent !== null}
         onOpenChange={(next) => {
           if (!next) setSelectedAgentKey(null);
@@ -3412,9 +3423,9 @@ function AgentCards({
                 : sortBy === "closedLost"
                   ? fmtNum(row.closedLostInPeriod)
                   : sortBy === "calls"
-                    ? row.outboundCalls === null
+                    ? row.totalCalls === null
                       ? "—"
-                      : fmtNum(row.outboundCalls)
+                      : fmtNum(row.totalCalls)
                     : fmtUSDExact(row.paidRevenue)}
             </div>
           </div>
@@ -3463,9 +3474,7 @@ function AgentCards({
             />
             <MiniMetric
               label={lang === "ar" ? "المكالمات" : "Calls"}
-              value={
-                !callsAvailable || row.outboundCalls === null ? "—" : fmtNum(row.outboundCalls)
-              }
+              value={!callsAvailable || row.totalCalls === null ? "—" : fmtNum(row.totalCalls)}
             />
             <MiniMetric
               label={lang === "ar" ? "وقت الكلام" : "Talk time"}
@@ -3698,7 +3707,14 @@ function AgentTable({
                   {fmtNum(row.slaWon)} / {fmtNum(row.slaLost)}
                 </td>
                 <td className="num px-3 py-3 text-end">
-                  {row.outboundCalls === null ? "—" : fmtNum(row.outboundCalls)}
+                  {row.totalCalls === null ? "—" : fmtNum(row.totalCalls)}
+                  {row.outboundCalls != null && row.inboundCalls != null && (
+                    <div className="mt-0.5 text-xs text-text-muted">
+                      {lang === "ar"
+                        ? `${fmtNum(row.outboundCalls)} صادرة · ${fmtNum(row.inboundCalls)} واردة`
+                        : `${fmtNum(row.outboundCalls)} outbound · ${fmtNum(row.inboundCalls)} inbound`}
+                    </div>
+                  )}
                 </td>
                 <td className="num px-3 py-3 text-end">
                   {row.answeredCalls === null ? "—" : fmtNum(row.answeredCalls)}
@@ -3757,11 +3773,13 @@ function AgentTable({
 function AgentPerformanceSheet({
   row,
   open,
+  callsReady,
   onOpenChange,
 }: {
   row: AgentRow | null;
   /** False when Odoo's operational sales report has no feed behind it at all. */
   open: boolean;
+  callsReady: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const { lang } = useI18n();
@@ -4286,8 +4304,8 @@ function AgentPerformanceSheet({
                   </h3>
                   <p className="mt-1 text-[12px] text-text-muted">
                     {lang === "ar"
-                      ? "كل الأرقام محسوبة على نفس الفترة المختارة أعلى الصفحة؛ وقت الكلام الفعلي لا يشمل الرنين والانتظار."
-                      : "Every figure uses the selected page date range; actual talk time excludes ringing and waiting."}
+                      ? "الإجمالي = الصادر + الوارد من Yeastar داخل الفترة المختارة، بدون المكالمات الداخلية. وقت الحديث لا يشمل الرنين والانتظار."
+                      : "Total = outbound + inbound Yeastar calls in the selected period, excluding internal calls. Talk time excludes ringing and waiting."}
                   </p>
                 </div>
                 <EvidenceLink href="#employee-call-evidence" />
@@ -4297,17 +4315,23 @@ function AgentPerformanceSheet({
                   label={lang === "ar" ? "إجمالي المكالمات" : "Total calls"}
                   value={row.totalCalls === null ? "—" : fmtNum(row.totalCalls)}
                   sub={
-                    row.answeredCalls === null
+                    row.totalCalls == null
                       ? lang === "ar"
-                        ? "غير مربوط بامتداد Yeastar"
-                        : "No Yeastar extension matched"
-                      : `${fmtNum(row.answeredCalls)} ${lang === "ar" ? "تم الرد" : "answered"} · ${fmtPct(row.answerRate, 1)}`
+                        ? callsReady
+                          ? "لا يوجد امتداد Yeastar مطابق"
+                          : "بيانات Yeastar غير متاحة للفترة"
+                        : callsReady
+                          ? "No Yeastar extension matched"
+                          : "Yeastar data unavailable for this period"
+                      : lang === "ar"
+                        ? `${fmtNum(row.outboundCalls ?? 0)} صادرة · ${fmtNum(row.inboundCalls ?? 0)} واردة · ${fmtNum(row.answeredCalls ?? 0)} تم الرد عليها`
+                        : `${fmtNum(row.outboundCalls ?? 0)} outbound · ${fmtNum(row.inboundCalls ?? 0)} inbound · ${fmtNum(row.answeredCalls ?? 0)} answered`
                   }
                   icon={<PhoneCall size={17} />}
                   evidenceHref="#employee-call-evidence"
                 />
                 <ProfileMetric
-                  label={lang === "ar" ? "الوقت من الاتصال إلى الإغلاق" : "Dial-to-hangup time"}
+                  label={lang === "ar" ? "إجمالي مدة المكالمات" : "Total call duration"}
                   value={formatCallHours(row.totalCallSeconds, lang)}
                   sub={
                     lang === "ar"
@@ -4320,7 +4344,11 @@ function AgentPerformanceSheet({
                 <ProfileMetric
                   label={lang === "ar" ? "متوسط مدة المكالمة" : "Average call length"}
                   value={formatCallDuration(row.averageCallSeconds, lang)}
-                  sub={lang === "ar" ? "للمكالمات التي تم الرد عليها" : "Across answered calls"}
+                  sub={
+                    lang === "ar"
+                      ? "لكل المكالمات، بما فيها غير المُجابة"
+                      : "Across all calls, including unanswered"
+                  }
                   icon={<AudioLines size={17} />}
                   evidenceHref="#employee-call-evidence"
                 />
@@ -4897,12 +4925,12 @@ function EmployeeCallsList({
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4 sm:p-5">
           <div>
             <SectionTitle className="mb-0">
-              {lang === "ar" ? "دليل المكالمات وتقييمها" : "Call evidence and scores"}
+              {lang === "ar" ? "المكالمات المتاحة للتقييم" : "Calls available for review"}
             </SectionTitle>
             <p className="mt-1 text-[12px] text-text-muted">
               {lang === "ar"
-                ? `المكالمات الأقل من ${QUALITY_REVIEW_THRESHOLD} تظهر أولًا. افتح أي مكالمة لسماع التسجيل ومراجعة النص المصحح وكل خصم ودليله.`
-                : `Calls below ${QUALITY_REVIEW_THRESHOLD} appear first. Open any call to hear the recording and review the corrected transcript and every evidence-backed deduction.`}
+                ? `دي سجلات Calls Hub المتاحة للمراجعة، مش سجل Yeastar الكامل اللي بيتحسب منه الإجمالي. المكالمات الأقل من ${QUALITY_REVIEW_THRESHOLD} تظهر أولًا.`
+                : `This is the reviewable Calls Hub list, not the full Yeastar log used for totals. Calls below ${QUALITY_REVIEW_THRESHOLD} appear first.`}
             </p>
           </div>
           {data && (
@@ -4929,8 +4957,8 @@ function EmployeeCallsList({
         ) : !data?.calls.length ? (
           <div className="grid min-h-32 place-items-center p-6 text-center text-sm text-text-muted">
             {lang === "ar"
-              ? "لا توجد مكالمات لهذا الموظف في الفترة المختارة."
-              : "No calls for this employee in the selected period."}
+              ? "لا توجد سجلات متاحة للتقييم في الفترة؛ راجع إجمالي Yeastar أعلى الملف."
+              : "No reviewable records in this period; see the Yeastar totals above."}
           </div>
         ) : (
           <div>
