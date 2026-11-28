@@ -33,6 +33,14 @@ export const YEASTAR_EMPLOYEE_IDENTITIES = [
   },
 ] as const;
 
+// Exact company-email matches verified against Odoo res.users and the live
+// Yeastar directory. Used for attribution only, not for the older per-person
+// lead-contact reader.
+const ADDITIONAL_CALL_IDENTITIES = [
+  { extension: "3041", pbxName: "Menna Magdy", name: "mennaallah magdy" },
+  { extension: "3044", pbxName: "Abdelrahman Tarek", name: "Abdulrahman Tareq Abdullwahab" },
+] as const;
+
 export function yeastarEmployeeIdentity(extension: string, name: string) {
   return YEASTAR_EMPLOYEE_IDENTITIES.find(
     (person) =>
@@ -46,5 +54,14 @@ export function yeastarEmployeeIdentity(extension: string, name: string) {
 /** Prefer the existing canonical CRM/target row over a loose PBX spelling. */
 export function yeastarEmployeeCandidateKeys(extension: string, name: string) {
   const person = yeastarEmployeeIdentity(extension, name);
-  return person ? [...new Set([person.name, ...person.aliases].map(normalizePersonName))] : [];
+  if (person) return [...new Set([person.name, ...person.aliases].map(normalizePersonName))];
+  const normalized = normalizePersonName(name);
+  const exact = ADDITIONAL_CALL_IDENTITIES.find(
+    (entry) =>
+      entry.extension === extension &&
+      [entry.name, entry.pbxName].some(
+        (candidate) => normalizePersonName(candidate) === normalized,
+      ),
+  );
+  return exact ? [normalizePersonName(exact.name)] : [];
 }

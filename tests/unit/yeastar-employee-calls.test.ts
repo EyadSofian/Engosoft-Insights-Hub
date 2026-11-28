@@ -43,6 +43,11 @@ describe("verified Nesting employee calls", () => {
     expect(yeastarEmployeeCandidateKeys("3093", "Solaf Ali")[0]).toBe("solaf ali mostafa kamal");
     expect(yeastarEmployeeIdentity("3005", "Different Person")).toBeUndefined();
     expect(yeastarEmployeeCandidateKeys("9999", "Ahmed Salah")).toEqual([]);
+    expect(yeastarEmployeeCandidateKeys("3041", "Menna Magdy")).toEqual(["mennaallah magdy"]);
+    expect(yeastarEmployeeCandidateKeys("3044", "Abdelrahman Tarek")).toEqual([
+      "abdulrahman tareq abdullwahab",
+    ]);
+    expect(yeastarEmployeeCandidateKeys("3044", "Abdelrahman Sabry")).toEqual([]);
   });
   it("excludes internal calls, another agent's legs, and invalid records", async () => {
     const { normalizeEmployeeCdr } = await import("@/lib/yeastar-employee-calls.server");
@@ -117,17 +122,15 @@ describe("verified Nesting employee calls", () => {
   it("rejects a reassigned extension instead of crediting its calls to the previous owner", async () => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          Response.json({
-            errcode: 0,
-            total_number: 4,
-            data: directory().map((p) =>
-              p.number === "3005" ? { ...p, caller_id_name: "Another employee" } : p,
-            ),
-          }),
-        ),
+      vi.fn().mockResolvedValue(
+        Response.json({
+          errcode: 0,
+          total_number: 4,
+          data: directory().map((p) =>
+            p.number === "3005" ? { ...p, caller_id_name: "Another employee" } : p,
+          ),
+        }),
+      ),
     );
     const { readVerifiedEmployeeCalls } = await import("@/lib/yeastar-employee-calls.server");
     await expect(readVerifiedEmployeeCalls("2026-11-11", "2026-11-11")).rejects.toThrow(
