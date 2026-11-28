@@ -105,6 +105,20 @@ export async function accessToken(): Promise<string> {
   return tokenPending;
 }
 
+/** Only for a dedicated CLI process after all of its PBX reads have ended. */
+export async function releaseCliAccessToken() {
+  if (!token) return;
+  const url = new URL(baseUrl() + "/openapi/v1.0/del_token");
+  url.searchParams.set("access_token", token.value);
+  token = null;
+  await fetch(url, {
+    headers: { "User-Agent": "Engosoft-Insights-Hub" },
+    signal: AbortSignal.timeout(5000),
+  })
+    .then((response) => response.body?.cancel())
+    .catch(() => undefined);
+}
+
 async function requestAccessToken(): Promise<string> {
   const response = await fetch(`${baseUrl()}/openapi/v1.0/get_token`, {
     method: "POST",
@@ -121,7 +135,8 @@ async function requestAccessToken(): Promise<string> {
     access_token?: string;
     access_token_expire_time?: number;
   };
-  if (body.errcode !== 0 || !body.access_token) throw new Error("Yeastar authentication failed");
+  if (body.errcode !== 0 || !body.access_token)
+    throw new Error(`Yeastar authentication failed (code ${Number(body.errcode) || "unknown"})`);
   token = {
     value: body.access_token,
     expiresAt: Date.now() + Math.min(Number(body.access_token_expire_time) || 1800, 1800) * 1000,

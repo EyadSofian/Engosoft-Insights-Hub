@@ -70,23 +70,47 @@ async function allPages(
   throw Error("Yeastar pagination incomplete; totals were not replaced");
 }
 
-async function roster(deadline: AbortSignal) {
+async function roster(deadline: AbortSignal, requireFresh: boolean) {
   if (rosterCache && rosterCache.expires > Date.now()) return rosterCache.value;
   if (rosterPending) return rosterPending;
-  rosterPending = allPages("extension/list", {}, 100, deadline)
-    .then((rows) => {
+  rosterPending = (async () => {
+    const pool = getSharedDatabasePool();
+    const stored = (
+      await pool.query<{ seen: Date; entries: [string, string][] }>(
+        "SELECT seen, entries FROM yeastar_call_extension_directory WHERE singleton",
+      )
+    ).rows[0];
+    const expires = stored ? Date.parse(String(stored.seen)) + 5 * 60_000 : 0;
+    if (stored && (expires > Date.now() || !requireFresh)) {
+      const value = new Map(stored.entries);
+      rosterCache = { expires, value };
+      return value;
+    }
+    try {
+      const rows = await allPages("extension/list", {}, 100, deadline);
       const value = new Map(
         rows
           .map((r) => [clean(r.number), clean(r.caller_id_name)] as const)
           .filter(([extension, name]) => /^\d+$/.test(extension) && name),
       );
       if (!value.size) throw Error("Yeastar extension directory is empty");
+      await pool.query(
+        `INSERT INTO yeastar_call_extension_directory (singleton, seen, entries)
+         VALUES (true, now(), $1::jsonb)
+         ON CONFLICT (singleton) DO UPDATE SET seen=EXCLUDED.seen, entries=EXCLUDED.entries`,
+        [JSON.stringify([...value])],
+      );
       rosterCache = { expires: Date.now() + 5 * 60_000, value };
       return value;
-    })
-    .finally(() => {
-      rosterPending = null;
-    });
+    } catch (error) {
+      if (requireFresh) throw error;
+      // A complete historical snapshot contains the employees with activity.
+      // Without directory evidence, don't claim zero for inactive employees.
+      return new Map<string, string>();
+    }
+  })().finally(() => {
+    rosterPending = null;
+  });
   return rosterPending;
 }
 
@@ -229,8 +253,11 @@ export async function readYeastarCallSummary(from: string, to: string): Promise<
     schema = pool
       .query(
         `CREATE TABLE IF NOT EXISTS yeastar_daily_call_totals (
-    day date PRIMARY KEY, through timestamptz NOT NULL, employees jsonb NOT NULL
-  )`,
+           day date PRIMARY KEY, through timestamptz NOT NULL, employees jsonb NOT NULL
+         );
+         CREATE TABLE IF NOT EXISTS yeastar_call_extension_directory (
+           singleton boolean PRIMARY KEY CHECK (singleton), seen timestamptz NOT NULL, entries jsonb NOT NULL
+         )`,
       )
       .catch((err) => {
         schema = null;
@@ -238,14 +265,11 @@ export async function readYeastarCallSummary(from: string, to: string): Promise<
       });
   await schema;
   const deadline = AbortSignal.timeout(55_000);
-  const [stored, directory] = await Promise.all([
-    pool.query<Snapshot>(
-      `SELECT day::text AS day, through, employees
+  const stored = await pool.query<Snapshot>(
+    `SELECT day::text AS day, through, employees
       FROM yeastar_daily_call_totals WHERE day BETWEEN $1::date AND $2::date`,
-      [from, to],
-    ),
-    roster(deadline),
-  ]);
+    [from, to],
+  );
   const byDay = new Map(stored.rows.map((row) => [row.day, row]));
   const batches: string[][] = [];
   for (const day of days) {
@@ -261,6 +285,7 @@ export async function readYeastarCallSummary(from: string, to: string): Promise<
       batch.push(day);
     else batches.push([day]);
   }
+  const directory = await roster(deadline, batches.length > 0);
   for (let i = 0; i < batches.length; i += 2) {
     const results = await Promise.all(
       batches.slice(i, i + 2).map((batch) => refresh(batch, directory, now, deadline)),

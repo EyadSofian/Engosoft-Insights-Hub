@@ -91,7 +91,10 @@ describe("complete Yeastar call totals", () => {
       { extension: inactive.number, totalCalls: 0, outboundCalls: 0, inboundCalls: 0 },
     ]);
     expect(result.recordsAvailable).toBe(false);
-    const insert = mocks.query.mock.calls.find(([sql]) => sql.includes("INSERT INTO"));
+    const insert = mocks.query.mock.calls.find(([sql]) =>
+      sql.includes("INSERT INTO yeastar_daily_call_totals"),
+    );
+    expect(insert).toBeDefined();
     expect(insert?.[1]?.[0]).not.toContain(base.call_to_number);
     expect(insert?.[1]?.[0]).not.toContain("record-1");
   });
@@ -127,7 +130,9 @@ describe("complete Yeastar call totals", () => {
     );
     const { readYeastarCallSummary } = await load();
     await expect(readYeastarCallSummary(day, day)).rejects.toThrow("repeated page");
-    expect(mocks.query.mock.calls.some(([sql]) => sql.includes("INSERT INTO"))).toBe(false);
+    expect(
+      mocks.query.mock.calls.some(([sql]) => sql.includes("INSERT INTO yeastar_daily_call_totals")),
+    ).toBe(false);
   });
 
   it("leaves call totals unavailable when PBX fails, rather than falling back to partial outbound data", async () => {
@@ -139,8 +144,37 @@ describe("complete Yeastar call totals", () => {
     );
     const { readYeastarCallSummary } = await load();
     await expect(readYeastarCallSummary(day, day)).rejects.toThrow("Yeastar call totals HTTP 503");
-    expect(mocks.query.mock.calls.some(([sql]) => /INSERT INTO|dashboard_rows/.test(sql))).toBe(
-      false,
-    );
+    expect(
+      mocks.query.mock.calls.some(([sql]) =>
+        /INSERT INTO yeastar_daily_call_totals|dashboard_rows/.test(sql),
+      ),
+    ).toBe(false);
+  });
+
+  it("serves complete closed periods during a PBX outage without inventing zeros", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    mocks.query.mockImplementation(async (sql: string) => ({
+      rows: sql.includes("SELECT day::text")
+        ? [
+            {
+              day,
+              through: day + "T21:59:59Z",
+              employees: [
+                {
+                  extension: ext.number,
+                  totalCalls: 2,
+                  inboundCalls: 1,
+                  outboundCalls: 1,
+                  name: ext.caller_id_name,
+                },
+              ],
+            },
+          ]
+        : [],
+    }));
+    const { readYeastarCallSummary } = await load();
+    expect((await readYeastarCallSummary(day, day)).employees).toMatchObject([
+      { extension: ext.number, totalCalls: 2 },
+    ]);
   });
 });
