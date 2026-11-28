@@ -128,9 +128,9 @@ export function summarizePbxDays(
     const extension = clean(direction === "outbound" ? r.call_from_number : r.call_to_number);
     const listed = directory.get(extension);
     const observed = clean(direction === "outbound" ? r.call_from_name : r.call_to_name);
-    // Retain names recorded on retired extensions rather than treating a
-    // missing directory entry as no calls. Never attribute external numbers.
-    if (!listed && (!/^\d{2,6}$/.test(extension) || !observed)) continue;
+    // A queue or ring group can itself have a short PBX number and a name.
+    // Only staff extensions from the PBX directory are eligible for totals.
+    if (!listed) continue;
     const at = Number(r.timestamp) * 1000;
     const id = clean(r.call_id) || clean(r.uid) || clean(r.new_id) || clean(r.id);
     if (!Number.isFinite(at) || at <= 0 || at > 8.64e15 || !id)
@@ -156,6 +156,7 @@ function mergeSnapshots(snapshots: Snapshot[], directory: Map<string, string>) {
   const merged = new Map<string, CallsHubEmployeeSummary>();
   for (const { employees } of snapshots) {
     for (const row of employees) {
+      if (directory.size && !directory.has(row.extension)) continue;
       const key = row.extension + "\0" + normalizePersonName(row.name);
       const held = merged.get(key);
       if (!held) merged.set(key, { ...row });
@@ -212,8 +213,10 @@ async function refresh(
       5000,
       deadline,
     );
-    const through = new Date(end * 1000).toISOString();
-    const snapshots = summarizePbxDays(rows, days, directory).map((row) => ({ ...row, through }));
+    const snapshots = summarizePbxDays(rows, days, directory).map((row) => ({
+      ...row,
+      through: new Date(Math.min(end, cairoDayBounds(row.day).end) * 1000).toISOString(),
+    }));
     // Persist aggregate counts only, not caller numbers or raw CDR.
     await getSharedDatabasePool().query(
       `INSERT INTO yeastar_daily_call_totals (day, through, employees)
@@ -296,7 +299,12 @@ export async function readYeastarCallSummary(from: string, to: string): Promise<
   return {
     ok: true,
     source: "Yeastar CDR · inbound + outbound · Cairo",
-    fetchedAt: new Date(snapshots.at(-1)!.through).toISOString(),
+    fetchedAt: new Date(
+      Math.min(
+        new Date(snapshots.at(-1)!.through).getTime(),
+        cairoDayBounds(days.at(-1)!).end * 1000,
+      ),
+    ).toISOString(),
     range: { from, to: days.at(-1)! },
     recordsAvailable: false,
     employees: mergeSnapshots(snapshots, directory),

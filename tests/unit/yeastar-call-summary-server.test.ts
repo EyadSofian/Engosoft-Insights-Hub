@@ -66,6 +66,12 @@ describe("complete Yeastar call totals", () => {
               inbound,
               { ...inbound, uid: "record-3", talk_duration: 50 },
               {
+                ...inbound,
+                call_id: "queue",
+                call_to_number: "6413",
+                call_to_name: "Mostafa Reda follow up",
+              },
+              {
                 ...base,
                 call_id: "internal",
                 call_type: "Internal",
